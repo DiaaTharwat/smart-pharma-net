@@ -75,12 +75,13 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
+  // --- تم التعديل هنا ---
   Future<bool> addMedicine({
     required String name,
     required String description,
     required double price,
     required int quantity,
-    required String pharmacyId,
+    required String pharmacyId, // هذا المتغير ضروري لتحديد الصيدلية
     required String category,
     required String expiryDate,
     required bool canBeSell,
@@ -105,7 +106,14 @@ class MedicineViewModel extends ChangeNotifier {
         'image_url': (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
       };
 
-      await _medicineRepository.addMedicine(medicineData);
+      // تم تعديل استدعاء الدالة لتمرير `pharmacyId`
+      // هذا يفترض أن لديك دالة في الـ Repository تقبل `pharmacyId`
+      // إذا كانت الدالة الحالية `addMedicine` لا تقبل `pharmacyId`، يجب تعديلها هناك أيضاً
+      await _medicineRepository.addMedicine(
+          medicineData: medicineData,
+          pharmacyId: pharmacyId // تمرير `pharmacyId` هنا هو مفتاح الحل
+      );
+
       await loadMedicines(pharmacyId: pharmacyId);
       _isLoading = false;
       notifyListeners();
@@ -118,7 +126,6 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  // --- تم التعديل هنا ---
   Future<bool> updateMedicine({
     required String name,
     required String description,
@@ -126,8 +133,8 @@ class MedicineViewModel extends ChangeNotifier {
     required int quantity,
     required String category,
     required String expiryDate,
-    required String medicineId, // تم تغيير الاسم من Id إلى medicineId للوضوح
-    required String pharmacyId, // تم تغيير الاسم من pharmacyIdForUpdate إلى pharmacyId
+    required String medicineId,
+    required String pharmacyId,
     required bool canBeSell,
     required int quantityToSell,
     required double priceSell,
@@ -150,7 +157,6 @@ class MedicineViewModel extends ChangeNotifier {
         'image_url': (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
       };
 
-      // تم تعديل استدعاء الدالة لتمرير كل المتغيرات المطلوبة
       await _medicineRepository.updateMedicine(
           pharmacyId: pharmacyId,
           medicineId: medicineId,
@@ -159,24 +165,21 @@ class MedicineViewModel extends ChangeNotifier {
 
       _isLoading = false;
       notifyListeners();
-      return true; // Return true on success
+      return true;
     } catch (e) {
       _error = e.toString();
       _isLoading = false;
       notifyListeners();
-      return false; // Return false on failure
+      return false;
     }
   }
 
-  // --- تم التعديل هنا ---
   Future<void> deleteMedicine({required String pharmacyId, required String medicineId}) async {
     _error = '';
     try {
-      // تم تعديل استدعاء الدالة لتمرير كل المتغيرات المطلوبة
       await _medicineRepository.deleteMedicine(pharmacyId: pharmacyId, medicineId: medicineId);
     } catch (e) {
       _error = e.toString();
-      // نعيد إلقاء الخطأ للواجهة للتعامل معه (مثلاً، إظهار SnackBar)
       rethrow;
     }
   }

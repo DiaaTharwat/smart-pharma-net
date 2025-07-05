@@ -178,7 +178,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
           imageUrl: _imageUrlController.text,
         );
       } else {
-        // --- تم التعديل هنا ---
         success = await medicineViewModel.updateMedicine(
           name: _nameController.text,
           description: _descriptionController.text,
@@ -186,8 +185,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
           quantity: int.parse(_quantityController.text),
           category: _selectedCategory,
           expiryDate: _expiryDateController.text,
-          medicineId: widget.medicine!.id, // تم تغيير `Id` إلى `medicineId`
-          pharmacyId: widget.medicine!.pharmacyId, // تم تغيير `pharmacyIdForUpdate` إلى `pharmacyId`
+          medicineId: widget.medicine!.id,
+          pharmacyId: widget.medicine!.pharmacyId,
           canBeSell: _selectedCanBeSell == 'Yes',
           quantityToSell: int.parse(_quantityToSellController.text),
           priceSell: double.parse(_priceSellController.text),

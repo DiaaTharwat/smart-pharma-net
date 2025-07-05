@@ -9,7 +9,7 @@ class MedicineRepository {
   // Endpoint for public search (as used on the website)
   static const String _publicSearchEndpoint = 'search_medicine/';
 
-  // --- إضافة: رابط جديد خاص بالمالك ---
+  // رابط جديد خاص بالمالك
   static const String _ownerEndpoint = 'medicine/owner/pharmacies/';
 
 
@@ -39,7 +39,6 @@ class MedicineRepository {
     }
   }
 
-  // --- تم تعديل هذه الدالة بالكامل ---
   Future<List<MedicineModel>> getMedicinesForPharmacy(String pharmacyId) async {
     try {
       print('Getting medicines for pharmacy: $pharmacyId using OWNER endpoint');
@@ -50,7 +49,6 @@ class MedicineRepository {
       // نستخدم الرابط الجديد لاستدعاء الـ API
       final response = await _apiService.authenticatedGet(fullOwnerEndpoint);
 
-      // لم نعد بحاجة للفلترة هنا، لأن السيرفر يرجع أدوية هذه الصيدلية فقط
       return _processMedicineList(response, 'medicines-for-pharmacy-$pharmacyId');
     } catch (e) {
       print('Error getting medicines for pharmacy: $e');
@@ -88,11 +86,17 @@ class MedicineRepository {
     }
   }
 
-  Future<MedicineModel> addMedicine(Map<String, dynamic> medicineData) async {
+  // --- تم التعديل هنا ---
+  // أصبحت الدالة تتطلب `pharmacyId` وتستخدم الرابط المخصص للمالك
+  Future<MedicineModel> addMedicine({required Map<String, dynamic> medicineData, required String pharmacyId}) async {
     try {
-      print('Adding new medicine...');
+      final String endpoint = '$_ownerEndpoint$pharmacyId/medicines/';
+      print('Adding new medicine using OWNER endpoint: $endpoint');
       print('Medicine data: $medicineData');
-      final response = await _apiService.post(_managementEndpoint, medicineData, headers: _apiService.pharmacyHeaders);
+
+      // تم استخدام الرابط الصحيح الخاص بالمالك
+      final response = await _apiService.post(endpoint, medicineData, headers: _apiService.pharmacyHeaders);
+
       if (response == null) {
         throw Exception('Failed to add medicine: No response from server');
       }
@@ -103,7 +107,6 @@ class MedicineRepository {
     }
   }
 
-  // --- تم التعديل هنا ---
   // أصبحت الدالة تتطلب `pharmacyId` و `medicineId` وتستخدم الرابط المخصص للمالك
   Future<void> updateMedicine({required String pharmacyId, required String medicineId, required Map<String, dynamic> medicineData}) async {
     try {
@@ -116,7 +119,6 @@ class MedicineRepository {
     }
   }
 
-  // --- تم التعديل هنا ---
   // أصبحت الدالة تتطلب `pharmacyId` و `medicineId` وتستخدم الرابط المخصص للمالك
   Future<void> deleteMedicine({required String pharmacyId, required String medicineId}) async {
     try {
