@@ -10,7 +10,10 @@ class PurchaseRepository {
 
   Future<void> createUserPurchase(UserPurchaseModel purchaseData) async {
     try {
-      await _apiService.post('exchange/user_purchase/', purchaseData.toJson());
+      // --- تم التعديل هنا ---
+      // تم استبدال `post` بدالة `publicPost` لأن هذه العملية
+      // يجب أن تكون متاحة للمستخدمين غير المسجلين.
+      await _apiService.publicPost('exchange/user_purchase/', purchaseData.toJson());
     } catch (e) {
       print('Error creating user purchase in repository: $e');
       rethrow;

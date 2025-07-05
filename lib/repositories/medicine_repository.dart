@@ -103,26 +103,28 @@ class MedicineRepository {
     }
   }
 
-  Future<void> updateMedicine(String id, Map<String, dynamic> medicineData) async {
+  // --- تم التعديل هنا ---
+  // أصبحت الدالة تتطلب `pharmacyId` و `medicineId` وتستخدم الرابط المخصص للمالك
+  Future<void> updateMedicine({required String pharmacyId, required String medicineId, required Map<String, dynamic> medicineData}) async {
     try {
-      print('Updating medicine with ID: $id using PATCH');
-      print('Update data: $medicineData');
-
-      await _apiService.patch('$_managementEndpoint$id/', medicineData, headers: _apiService.pharmacyHeaders);
-
+      final String endpoint = '$_ownerEndpoint$pharmacyId/medicines/$medicineId/';
+      print('Updating medicine using OWNER endpoint: $endpoint');
+      await _apiService.patch(endpoint, medicineData, headers: _apiService.pharmacyHeaders);
     } catch (e) {
       print('Error updating medicine in repository: $e');
       rethrow;
     }
   }
 
-  Future<void> deleteMedicine(String id) async {
+  // --- تم التعديل هنا ---
+  // أصبحت الدالة تتطلب `pharmacyId` و `medicineId` وتستخدم الرابط المخصص للمالك
+  Future<void> deleteMedicine({required String pharmacyId, required String medicineId}) async {
     try {
-      print('Deleting medicine with ID: $id');
-      await _apiService.delete('$_managementEndpoint$id/', '', headers: _apiService.pharmacyHeaders);
-      print('Medicine deleted successfully');
+      final String endpoint = '$_ownerEndpoint$pharmacyId/medicines/$medicineId/';
+      print('Deleting medicine using OWNER endpoint: $endpoint');
+      await _apiService.delete(endpoint, '', headers: _apiService.pharmacyHeaders);
     } catch (e) {
-      print('Error deleting medicine: $e');
+      print('Error deleting medicine in repository: $e');
       rethrow;
     }
   }

@@ -1,18 +1,17 @@
 // lib/viewmodels/subscription_viewmodel.dart
 import 'package:flutter/material.dart';
 import 'package:smart_pharma_net/repositories/subscription_repository.dart';
-import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart'; // -- إضافة --
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/services/api_service.dart';
 
 class SubscriptionViewModel extends ChangeNotifier {
   final SubscriptionRepository _subscriptionRepository;
   final ApiService _apiService;
-  final AuthViewModel _authViewModel; // -- إضافة --
+  final AuthViewModel _authViewModel;
 
   bool _isLoading = false;
   String? _error;
 
-  // -- تعديل -- تم تحديث الـ constructor
   SubscriptionViewModel(this._subscriptionRepository, this._apiService, this._authViewModel);
 
   // Getters
@@ -35,21 +34,17 @@ class SubscriptionViewModel extends ChangeNotifier {
     error = null;
 
     try {
-      // -- تعديل --
-      // تم استبدال `getPharmacyName` بـ `getPharmacyId` من AuthViewModel
       final pharmacyId = await _authViewModel.getPharmacyId();
       if (pharmacyId == null) {
-        throw Exception('Pharmacy ID not found. Please log in as a pharmacy.');
+        throw Exception('Pharmacy ID not found. Please select a pharmacy to manage.');
       }
 
-      // -- تعديل --
-      // تم تحديث استدعاء الدالة لتتوافق مع التغييرات في الـ Repository
       await _subscriptionRepository.subscribe(
         type: type,
         pharmacyId: pharmacyId,
       );
 
-      await _apiService.saveSubscriptionType(type); // Save subscribed type locally
+      await _apiService.saveSubscriptionType(type);
 
       isLoading = false;
       return true;

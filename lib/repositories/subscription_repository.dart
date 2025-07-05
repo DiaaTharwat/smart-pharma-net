@@ -6,19 +6,15 @@ class SubscriptionRepository {
 
   SubscriptionRepository(this._apiService); // Constructor now takes ApiService
 
-  // -- تعديل --
   // الدالة الآن تتطلب `pharmacyId` و `type` للاشتراك
-  // تم تغيير `pharmacyName` إلى `pharmacyId`
   Future<Map<String, dynamic>> subscribe({required String type, required String pharmacyId}) async {
     try {
       print('Subscribing pharmacy ID: $pharmacyId to plan: $type');
 
-      // -- تعديل --
       // جسم الطلب الآن يحتوي على النوع فقط، لأن الصيدلية يتم تحديدها من الرابط
       final payload = {'type': type};
 
-      // -- تعديل --
-      // تم استخدام الدالة الجديدة `postForPharmacy` لبناء الرابط الصحيح
+      // يتم استخدام الدالة الجديدة `postForPharmacy` لبناء الرابط الصحيح
       final dynamic responseData = await _apiService.postForPharmacy(
         'exchange/subscripe/', // نقطة النهاية الأساسية من السواجر
         payload,

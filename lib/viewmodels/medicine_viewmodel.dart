@@ -1,5 +1,4 @@
 // lib/viewmodels/medicine_viewmodel.dart
-
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/medicine_model.dart';
@@ -24,7 +23,7 @@ class MedicineViewModel extends ChangeNotifier {
   Future<void> loadMedicines({String? pharmacyId, bool forceLoadAll = false}) async {
     _isLoading = true;
     _error = '';
-    if (!forceLoadAll) notifyListeners();
+    notifyListeners();
 
     try {
       List<MedicineModel> fetchedMedicines;
@@ -103,15 +102,11 @@ class MedicineViewModel extends ChangeNotifier {
         'can_be_sell': canBeSell,
         'quantity_to_sell': quantityToSell,
         'price_sell': priceSell.toString(),
-        // --- تم التعديل هنا ---
-        // نتأكد من أننا نرسل `null` إذا كان الرابط فارغًا
         'image_url': (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
       };
 
       await _medicineRepository.addMedicine(medicineData);
-
       await loadMedicines(pharmacyId: pharmacyId);
-
       _isLoading = false;
       notifyListeners();
       return true;
@@ -123,6 +118,7 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
+  // --- تم التعديل هنا ---
   Future<bool> updateMedicine({
     required String name,
     required String description,
@@ -130,8 +126,8 @@ class MedicineViewModel extends ChangeNotifier {
     required int quantity,
     required String category,
     required String expiryDate,
-    required String Id,
-    required String pharmacyIdForUpdate,
+    required String medicineId, // تم تغيير الاسم من Id إلى medicineId للوضوح
+    required String pharmacyId, // تم تغيير الاسم من pharmacyIdForUpdate إلى pharmacyId
     required bool canBeSell,
     required int quantityToSell,
     required double priceSell,
@@ -140,7 +136,6 @@ class MedicineViewModel extends ChangeNotifier {
     _isLoading = true;
     _error = '';
     notifyListeners();
-
     try {
       final medicineData = {
         'name': name.trim(),
@@ -152,35 +147,37 @@ class MedicineViewModel extends ChangeNotifier {
         'can_be_sell': canBeSell,
         'quantity_to_sell': quantityToSell,
         'price_sell': priceSell.toString(),
-        // --- تم التعديل هنا ---
         'image_url': (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
       };
 
-      await _medicineRepository.updateMedicine(Id, medicineData);
+      // تم تعديل استدعاء الدالة لتمرير كل المتغيرات المطلوبة
+      await _medicineRepository.updateMedicine(
+          pharmacyId: pharmacyId,
+          medicineId: medicineId,
+          medicineData: medicineData
+      );
 
-    } catch (e) {
-      print("Update operation threw a non-critical exception, proceeding as success. Error: $e");
-    } finally {
-      await loadMedicines(pharmacyId: pharmacyIdForUpdate);
       _isLoading = false;
       notifyListeners();
-    }
-    return true;
-  }
-
-  Future<void> deleteMedicine(String id) async {
-    try {
-      _isLoading = true;
-      notifyListeners();
-      await _medicineRepository.deleteMedicine(id);
-      final currentPharmacyId = _medicines.isNotEmpty ? _medicines.first.pharmacyId : null;
-      await loadMedicines(pharmacyId: currentPharmacyId);
+      return true; // Return true on success
     } catch (e) {
       _error = e.toString();
-      throw Exception('Failed to delete medicine: $e');
-    } finally {
       _isLoading = false;
       notifyListeners();
+      return false; // Return false on failure
+    }
+  }
+
+  // --- تم التعديل هنا ---
+  Future<void> deleteMedicine({required String pharmacyId, required String medicineId}) async {
+    _error = '';
+    try {
+      // تم تعديل استدعاء الدالة لتمرير كل المتغيرات المطلوبة
+      await _medicineRepository.deleteMedicine(pharmacyId: pharmacyId, medicineId: medicineId);
+    } catch (e) {
+      _error = e.toString();
+      // نعيد إلقاء الخطأ للواجهة للتعامل معه (مثلاً، إظهار SnackBar)
+      rethrow;
     }
   }
 

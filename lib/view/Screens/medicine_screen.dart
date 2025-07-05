@@ -10,8 +10,6 @@ import 'add_medicine_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 
 class MedicineScreen extends StatefulWidget {
-  // --- تعديل ---
-  // لم نعد بحاجة لتمرير أي متغيرات هنا
   const MedicineScreen({Key? key}) : super(key: key);
 
   @override
@@ -55,30 +53,24 @@ class _MedicineScreenState extends State<MedicineScreen>
     _controller.forward();
   }
 
-  // --- تعديل ---
-  // أصبحت هذه الدالة تحصل على `pharmacyId` من AuthViewModel
   Future<void> _initializeData() async {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         final authVm = context.read<AuthViewModel>();
         final medicineVm = context.read<MedicineViewModel>();
-        final pharmacyId = await authVm.getPharmacyId(); // Get current active pharmacy ID
+        final pharmacyId = await authVm.getPharmacyId();
 
         if (pharmacyId != null) {
           medicineVm.loadMedicines(pharmacyId: pharmacyId);
         } else {
-          // Handle case where no pharmacy is active
           print("Error: No pharmacy context found in MedicineScreen.");
         }
       }
     });
   }
 
-  // --- تعديل ---
-  // أصبحت هذه الدالة تتعامل مع حالة تقمص الشخصية
   Future<void> _handleBackNavigation() async {
     final authViewModel = context.read<AuthViewModel>();
-    // إذا كان المالك في وضع التقمص، قم بإيقافه عند الرجوع
     if (authViewModel.isImpersonating) {
       await authViewModel.stopImpersonation();
     }
@@ -95,7 +87,6 @@ class _MedicineScreenState extends State<MedicineScreen>
   }
 
   Widget _buildMedicineCard(MedicineModel medicine, double cardWidth) {
-    // This widget's internal logic remains the same
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
       imageWidget = Image.network(
@@ -230,9 +221,7 @@ class _MedicineScreenState extends State<MedicineScreen>
 
   @override
   Widget build(BuildContext context) {
-    // We watch AuthViewModel to rebuild when impersonation status changes
     final authViewModel = context.watch<AuthViewModel>();
-
     return WillPopScope(
       onWillPop: () async {
         await _handleBackNavigation();
@@ -259,7 +248,6 @@ class _MedicineScreenState extends State<MedicineScreen>
                             icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 28),
                             onPressed: _handleBackNavigation,
                           ),
-                          // Show menu only for real pharmacy logins, not impersonation
                           if (authViewModel.isPharmacy)
                             IconButton(
                               icon: const Icon(Icons.menu, color: Colors.white, size: 28),
@@ -274,7 +262,6 @@ class _MedicineScreenState extends State<MedicineScreen>
                             ),
                           Expanded(
                             child: Text(
-                              // Use the new getter for the pharmacy name
                               authViewModel.currentPharmacyName ?? 'Medicines',
                               style: const TextStyle(
                                 fontSize: 26,
@@ -304,9 +291,7 @@ class _MedicineScreenState extends State<MedicineScreen>
                             onChanged: (value) async {
                               final pharmacyId = await authViewModel.getPharmacyId();
                               if (pharmacyId != null) {
-                                context
-                                    .read<MedicineViewModel>()
-                                    .searchMedicines(value, pharmacyId: pharmacyId);
+                                context.read<MedicineViewModel>().searchMedicines(value, pharmacyId: pharmacyId);
                               }
                             },
                           ),
@@ -320,47 +305,25 @@ class _MedicineScreenState extends State<MedicineScreen>
                 child: Consumer<MedicineViewModel>(
                   builder: (context, viewModel, child) {
                     if (viewModel.isLoading) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF636AE8)),
-                        ),
-                      );
+                      return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF636AE8))));
                     }
                     if (viewModel.medicines.isEmpty) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(
-                              Icons.medication_outlined,
-                              size: 80,
-                              color: Colors.grey.shade600,
-                            ),
+                            Icon(Icons.medication_outlined, size: 80, color: Colors.grey.shade600),
                             const SizedBox(height: 20),
-                            Text(
-                              'No medicines found',
-                              style: TextStyle(
-                                fontSize: 20,
-                                color: Colors.white.withOpacity(0.7),
-                              ),
-                            ),
+                            Text('No medicines found', style: TextStyle(fontSize: 20, color: Colors.white.withOpacity(0.7))),
                           ],
                         ),
                       );
                     }
-
                     final screenPadding = const EdgeInsets.all(20.0);
                     final horizontalSpacing = 20.0;
                     final verticalSpacing = 20.0;
-
                     return RefreshIndicator(
-                      onRefresh: () async {
-                        final pharmacyId = await authViewModel.getPharmacyId();
-                        if (pharmacyId != null) {
-                          context.read<MedicineViewModel>().loadMedicines(pharmacyId: pharmacyId);
-                        }
-                      },
+                      onRefresh: _initializeData,
                       color: const Color(0xFF636AE8),
                       backgroundColor: Colors.white.withOpacity(0.8),
                       child: SingleChildScrollView(
@@ -373,7 +336,7 @@ class _MedicineScreenState extends State<MedicineScreen>
                             final double screenWidth = MediaQuery.of(context).size.width;
                             final double totalHorizontalPadding = screenPadding.left + screenPadding.right;
                             final double totalSpacing = horizontalSpacing * 2;
-                            final double cardWidth = (screenWidth - totalHorizontalPadding - totalSpacing) / 3;
+                            final double cardWidth = (screenWidth > 1200) ? (screenWidth - totalHorizontalPadding - totalSpacing) / 3 : (screenWidth > 800) ? (screenWidth - totalHorizontalPadding - horizontalSpacing) / 2 : (screenWidth - totalHorizontalPadding);
                             return _buildMedicineCard(medicine, cardWidth);
                           }).toList(),
                         ),
@@ -397,14 +360,13 @@ class _MedicineScreenState extends State<MedicineScreen>
               ),
             );
             if (result == true && mounted) {
-              context.read<MedicineViewModel>().loadMedicines(pharmacyId: pharmacyId);
+              _initializeData();
             }
           },
           backgroundColor: const Color(0xFF636AE8),
           foregroundColor: Colors.white,
           icon: const Icon(Icons.add, color: Colors.white, size: 28),
-          label: const Text('Add Medicine',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          label: const Text('Add Medicine', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
           elevation: 8,
         ),
@@ -491,10 +453,8 @@ class _MedicineScreenState extends State<MedicineScreen>
                       const SizedBox(height: 20),
                       _buildDetailCard(title: 'Quantity To Sell', value: '${medicine.quantityToSell ?? 'N/A'} units', icon: Icons.shopping_cart),
                       const SizedBox(height: 30),
-                      if (authViewModel.isAdmin) // Show if admin is viewing
-                        _buildAdminActionButtons(medicine)
-                      else
-                        _buildBuyButton(),
+                      // The condition here can be simplified as this screen is only for a logged-in pharmacy/impersonator
+                      _buildAdminActionButtons(medicine)
                     ],
                   ),
                 ),
@@ -597,7 +557,7 @@ class _MedicineScreenState extends State<MedicineScreen>
       ),
     );
     if (result == true && mounted) {
-      context.read<MedicineViewModel>().loadMedicines(pharmacyId: pharmacyId);
+      _initializeData();
     }
   }
 
@@ -632,17 +592,19 @@ class _MedicineScreenState extends State<MedicineScreen>
       if(pharmacyId == null) return;
 
       try {
-        await context.read<MedicineViewModel>().deleteMedicine(medicine.id);
+        // --- تم التعديل هنا ---
+        await context.read<MedicineViewModel>().deleteMedicine(
+            pharmacyId: pharmacyId,
+            medicineId: medicine.id
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Medicine deleted successfully'),
               backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.fixed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
             ),
           );
-          context.read<MedicineViewModel>().loadMedicines(pharmacyId: pharmacyId);
+          _initializeData();
         }
       } catch (e) {
         if (mounted) {
@@ -650,8 +612,6 @@ class _MedicineScreenState extends State<MedicineScreen>
             SnackBar(
               content: Text('Error deleting medicine: ${e.toString()}'),
               backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.fixed,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
             ),
           );
         }

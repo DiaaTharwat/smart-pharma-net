@@ -1,3 +1,4 @@
+// lib/view/Screens/add_medicine_screen.dart
 // ignore_for_file: deprecated_member_use, unnecessary_null_comparison, unused_import
 
 import 'package:flutter/material.dart';
@@ -177,6 +178,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
           imageUrl: _imageUrlController.text,
         );
       } else {
+        // --- تم التعديل هنا ---
         success = await medicineViewModel.updateMedicine(
           name: _nameController.text,
           description: _descriptionController.text,
@@ -184,8 +186,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
           quantity: int.parse(_quantityController.text),
           category: _selectedCategory,
           expiryDate: _expiryDateController.text,
-          Id: widget.medicine!.id,
-          pharmacyIdForUpdate: widget.medicine!.pharmacyId,
+          medicineId: widget.medicine!.id, // تم تغيير `Id` إلى `medicineId`
+          pharmacyId: widget.medicine!.pharmacyId, // تم تغيير `pharmacyIdForUpdate` إلى `pharmacyId`
           canBeSell: _selectedCanBeSell == 'Yes',
           quantityToSell: int.parse(_quantityToSellController.text),
           priceSell: double.parse(_priceSellController.text),
@@ -203,7 +205,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
             SnackBar(
               content: Text(widget.medicine == null ? 'Medicine added successfully!' : 'Medicine updated successfully!'),
               backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.fixed, // ## التعديل الأول ##
+              behavior: SnackBarBehavior.fixed,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -215,7 +217,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
             SnackBar(
               content: Text('Error: ${medicineViewModel.error}'),
               backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.fixed, // ## التعديل الثاني ##
+              behavior: SnackBarBehavior.fixed,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),

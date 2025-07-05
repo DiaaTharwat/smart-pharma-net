@@ -54,7 +54,7 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Purchase successful!'),
+            content: Text('Purchase successful! Your request has been sent.'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -101,13 +101,11 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24.0).copyWith(top: 100),
             child: Column(
               children: [
-                // --- بداية التعديل ---
-                // تم نقل العنوان هنا
                 Text(
                   'Buy from ${widget.medicine.pharmacyName}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 28, // تكبير الخط
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                     shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
@@ -118,13 +116,11 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                   'Medicine: ${widget.medicine.name}',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18, // تكبير الخط
+                    fontSize: 18,
                     color: Colors.white.withOpacity(0.8),
                   ),
                 ),
-                const SizedBox(height: 40), // مسافة بين العنوان والفورم
-
-                // الفورم كما هو
+                const SizedBox(height: 40),
                 Form(
                   key: _formKey,
                   child: Column(
@@ -199,7 +195,6 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                     ],
                   ),
                 ),
-                // --- نهاية التعديل ---
               ],
             ),
           ),
