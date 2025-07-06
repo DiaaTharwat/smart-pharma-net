@@ -1,4 +1,3 @@
-// lib/view/Screens/medicine_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
@@ -58,7 +57,7 @@ class _MedicineScreenState extends State<MedicineScreen>
       if (mounted) {
         final authVm = context.read<AuthViewModel>();
         final medicineVm = context.read<MedicineViewModel>();
-        final pharmacyId = await authVm.getPharmacyId();
+        final pharmacyId = authVm.activePharmacyId;
 
         if (pharmacyId != null) {
           medicineVm.loadMedicines(pharmacyId: pharmacyId);
@@ -69,15 +68,20 @@ class _MedicineScreenState extends State<MedicineScreen>
     });
   }
 
+  // ========== Fix Start: Modified back navigation logic ==========
   Future<void> _handleBackNavigation() async {
     final authViewModel = context.read<AuthViewModel>();
+    // Stop impersonation only if it's an admin impersonating
     if (authViewModel.isImpersonating) {
       await authViewModel.stopImpersonation();
     }
+    // For all cases (admin or pharmacy), just pop the screen
     if (mounted) {
       Navigator.pop(context);
     }
   }
+  // ========== Fix End ==========
+
 
   @override
   void dispose() {
@@ -262,7 +266,7 @@ class _MedicineScreenState extends State<MedicineScreen>
                             ),
                           Expanded(
                             child: Text(
-                              authViewModel.currentPharmacyName ?? 'Medicines',
+                              authViewModel.activePharmacyName ?? 'Medicines',
                               style: const TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
@@ -276,7 +280,7 @@ class _MedicineScreenState extends State<MedicineScreen>
                             icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
                             onPressed: _initializeData,
                           ),
-                          if (authViewModel.isPharmacy) const NotificationIcon(),
+                          if (authViewModel.canActAsPharmacy) const NotificationIcon(),
                         ],
                       ),
                       const SizedBox(height: 20),
@@ -289,7 +293,7 @@ class _MedicineScreenState extends State<MedicineScreen>
                             hintText: 'Search medicines...',
                             icon: Icons.search,
                             onChanged: (value) async {
-                              final pharmacyId = await authViewModel.getPharmacyId();
+                              final pharmacyId = authViewModel.activePharmacyId;
                               if (pharmacyId != null) {
                                 context.read<MedicineViewModel>().searchMedicines(value, pharmacyId: pharmacyId);
                               }
@@ -350,7 +354,7 @@ class _MedicineScreenState extends State<MedicineScreen>
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () async {
-            final pharmacyId = await authViewModel.getPharmacyId();
+            final pharmacyId = authViewModel.activePharmacyId;
             if (pharmacyId == null) return;
 
             final result = await Navigator.push<bool>(
@@ -384,7 +388,6 @@ class _MedicineScreenState extends State<MedicineScreen>
   }
 
   Widget _buildMedicineDetailsSheet(MedicineModel medicine) {
-    final authViewModel = context.read<AuthViewModel>();
     return DraggableScrollableSheet(
       initialChildSize: 0.8,
       minChildSize: 0.5,
@@ -453,7 +456,6 @@ class _MedicineScreenState extends State<MedicineScreen>
                       const SizedBox(height: 20),
                       _buildDetailCard(title: 'Quantity To Sell', value: '${medicine.quantityToSell ?? 'N/A'} units', icon: Icons.shopping_cart),
                       const SizedBox(height: 30),
-                      // The condition here can be simplified as this screen is only for a logged-in pharmacy/impersonator
                       _buildAdminActionButtons(medicine)
                     ],
                   ),
@@ -529,22 +531,10 @@ class _MedicineScreenState extends State<MedicineScreen>
     );
   }
 
-  Widget _buildBuyButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: PulsingActionButton(
-        label: 'Buy Now',
-        buttonColor: Colors.green,
-        shadowBaseColor: Colors.green,
-        onTap: () { /* Implement buy now logic */ },
-      ),
-    );
-  }
-
   Future<void> _handleEditMedicine(MedicineModel medicine) async {
     Navigator.pop(context);
     final authViewModel = context.read<AuthViewModel>();
-    final pharmacyId = await authViewModel.getPharmacyId();
+    final pharmacyId = authViewModel.activePharmacyId;
     if(pharmacyId == null) return;
 
     final result = await Navigator.push<bool>(
@@ -588,11 +578,10 @@ class _MedicineScreenState extends State<MedicineScreen>
 
     if (confirm == true && mounted) {
       final authViewModel = context.read<AuthViewModel>();
-      final pharmacyId = await authViewModel.getPharmacyId();
+      final pharmacyId = authViewModel.activePharmacyId;
       if(pharmacyId == null) return;
 
       try {
-        // --- تم التعديل هنا ---
         await context.read<MedicineViewModel>().deleteMedicine(
             pharmacyId: pharmacyId,
             medicineId: medicine.id

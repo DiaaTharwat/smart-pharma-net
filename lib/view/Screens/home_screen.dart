@@ -1,4 +1,3 @@
-// lib/view/Screens/home_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -26,9 +25,6 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  bool _isAdmin = false;
-  bool _isPharmacyUser = false;
-  String? _currentPharmacyIdForUser;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -61,32 +57,17 @@ class _HomeScreenState extends State<HomeScreen>
     _animationController.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _checkUserStatus();
       final authViewModel = context.read<AuthViewModel>();
       final medicineViewModel = context.read<MedicineViewModel>();
       final pharmacyViewModel = context.read<PharmacyViewModel>();
 
       medicineViewModel.loadMedicines(
-          pharmacyId: _currentPharmacyIdForUser, forceLoadAll: authViewModel.isAdmin && !authViewModel.isPharmacy);
+          pharmacyId: authViewModel.activePharmacyId, forceLoadAll: authViewModel.isAdmin && !authViewModel.canActAsPharmacy);
 
-      pharmacyViewModel.loadPharmacies(searchQuery: '').catchError((error) {
+      pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel).catchError((error) {
         print("Could not load pharmacies, continuing without them. Error: $error");
       });
     });
-  }
-
-  Future<void> _checkUserStatus() async {
-    final authViewModel = context.read<AuthViewModel>();
-    final role = await authViewModel.getUserRole();
-    if (mounted) {
-      setState(() {
-        _isAdmin = role == 'admin';
-        _isPharmacyUser = role == 'pharmacy';
-      });
-      if (_isPharmacyUser) {
-        _currentPharmacyIdForUser = await authViewModel.getPharmacyId();
-      }
-    }
   }
 
   @override
@@ -120,7 +101,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<LatLng?> _getUserLocation() async {
-    // ... No changes to this method
     return null;
   }
 
@@ -144,13 +124,14 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (confirm == true && mounted) {
       final medicineViewModel = context.read<MedicineViewModel>();
+      final authViewModel = context.read<AuthViewModel>();
       try {
         await medicineViewModel.deleteMedicine(pharmacyId: medicine.pharmacyId, medicineId: medicine.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Medicine deleted successfully'), backgroundColor: Colors.green),
           );
-          medicineViewModel.loadMedicines(forceLoadAll: true);
+          medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: authViewModel.isAdmin);
         }
       } catch (e) {
         if (mounted) {
@@ -163,6 +144,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _handleEditMedicine(BuildContext context, MedicineModel medicine) async {
+    final authViewModel = context.read<AuthViewModel>();
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
@@ -178,15 +160,20 @@ class _HomeScreenState extends State<HomeScreen>
             content: Text('Medicine updated successfully!'),
             backgroundColor: Colors.green),
       );
-      context.read<MedicineViewModel>().loadMedicines(forceLoadAll: true);
+      context.read<MedicineViewModel>().loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: authViewModel.isAdmin);
     }
   }
 
-  // --- تم تعديل هذه الدالة بالكامل ---
-  Widget _buildMedicineCard(MedicineModel medicine, double cardWidth) {
-    final pharmacyViewModel = context.read<PharmacyViewModel>();
-    final ownedPharmacyIds = pharmacyViewModel.pharmacies.map((p) => p.id).toSet();
-    final bool canAdminEdit = _isAdmin && ownedPharmacyIds.contains(medicine.pharmacyId);
+  Widget _buildMedicineCard(BuildContext context, MedicineModel medicine, double cardWidth) {
+    final authViewModel = context.watch<AuthViewModel>();
+
+    // ========== Fix Start: Corrected and final logic for showing management buttons ==========
+    // The buttons appear ONLY if the user is actively acting as the pharmacy that owns this medicine.
+    final bool canManage = authViewModel.canActAsPharmacy && medicine.pharmacyId == authViewModel.activePharmacyId;
+
+    // The buy button appears ONLY for a normal user (not admin, not pharmacy).
+    final bool isNormalUser = !authViewModel.isAdmin && !authViewModel.isPharmacy;
+    // ========== Fix End ==========
 
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
@@ -259,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen>
                         const SizedBox(height: 2),
                         Text(medicine.category, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
-                        if (!_isPharmacyUser)
+                        if (!authViewModel.isPharmacy)
                           Row(
                             children: [
                               Icon(Icons.store_outlined, size: 12, color: Colors.white.withOpacity(0.7)),
@@ -291,10 +278,9 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
 
-            // --- تعديل: إضافة الأزرار بشكل شرطي هنا ---
-            if (canAdminEdit)
+            if (canManage)
               _buildAdminActionButtons(context, medicine)
-            else if (!_isAdmin && !_isPharmacyUser)
+            else if (isNormalUser)
               _buildUserActionButtons(context, medicine)
           ],
         ),
@@ -302,7 +288,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- إضافة: ويدجت جديدة لأزرار المالك ---
   Widget _buildAdminActionButtons(BuildContext context, MedicineModel medicine) {
     return Container(
       decoration: BoxDecoration(
@@ -333,7 +318,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- إضافة: ويدجت جديدة لزر شراء المستخدم ---
   Widget _buildUserActionButtons(BuildContext context, MedicineModel medicine) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
@@ -357,7 +341,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- تعديل: هذه الدالة الآن تظهر التفاصيل فقط للقراءة ---
   void _showReadOnlyMedicineDetails(MedicineModel medicine) {
     showModalBottomSheet(
       context: context,
@@ -453,7 +436,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     return WillPopScope(
       onWillPop: () async {
-        if (authViewModel.isAdmin && authViewModel.isPharmacy) {
+        if (authViewModel.isImpersonating) {
           await _returnToAdminHomeAndLogoutPharmacy();
           return false;
         }
@@ -500,7 +483,7 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                           ),
                           InkWell(
-                            onTap: authViewModel.isAdmin && authViewModel.isPharmacy
+                            onTap: authViewModel.isImpersonating
                                 ? _returnToAdminHomeAndLogoutPharmacy
                                 : () => _handleLogout(context),
                             borderRadius: BorderRadius.circular(8),
@@ -510,7 +493,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Icon(
-                                    authViewModel.isAdmin && authViewModel.isPharmacy
+                                    authViewModel.isImpersonating
                                         ? Icons.exit_to_app
                                         : Icons.logout,
                                     color: Colors.white,
@@ -518,7 +501,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    authViewModel.isAdmin && authViewModel.isPharmacy
+                                    authViewModel.isImpersonating
                                         ? 'Exit Pharmacy'
                                         : 'Logout',
                                     style: const TextStyle(color: Colors.white, fontSize: 8),
@@ -555,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 setState(() { _searchQuery = value; });
                                 context
                                     .read<MedicineViewModel>()
-                                    .searchMedicines(value, pharmacyId: _isPharmacyUser ? _currentPharmacyIdForUser : null);
+                                    .searchMedicines(value, pharmacyId: authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
                               },
                             ),
                             const SizedBox(height: 16),
@@ -592,15 +575,15 @@ class _HomeScreenState extends State<HomeScreen>
                                 final medicineViewModel = context.read<MedicineViewModel>();
                                 setState(() { _isLoadingLocation = true; });
                                 if (_isSortingByDistance) {
-                                  medicineViewModel.clearDistanceSort(pharmacyIdForReset: _currentPharmacyIdForUser);
+                                  medicineViewModel.clearDistanceSort(pharmacyIdForReset: authViewModel.activePharmacyId);
                                   setState(() { _isSortingByDistance = false; });
                                 } else {
                                   LatLng? userLocation = await _getUserLocation();
                                   if (userLocation != null && mounted) {
                                     if (pharmacyViewModel.pharmacies.isEmpty) {
-                                      await pharmacyViewModel.loadPharmacies(searchQuery: '');
+                                      await pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel);
                                     }
-                                    if (!_isPharmacyUser && (medicineViewModel.medicines.length != medicineViewModel.medicines.length || _searchQuery.isNotEmpty)) {
+                                    if (!authViewModel.isPharmacy && (medicineViewModel.medicines.length != medicineViewModel.medicines.length || _searchQuery.isNotEmpty)) {
                                       await medicineViewModel.loadMedicines(forceLoadAll: true);
                                     }
 
@@ -670,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen>
                             PulsingActionButton(
                               label: 'Retry',
                               onTap: () {
-                                medicineViewModel.loadMedicines(pharmacyId: _currentPharmacyIdForUser, forceLoadAll: !_isPharmacyUser);
+                                medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: !authViewModel.isPharmacy);
                               },
                             ),
                           ],
@@ -719,7 +702,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                     return RefreshIndicator(
                       onRefresh: () async {
-                        medicineViewModel.loadMedicines(pharmacyId: _currentPharmacyIdForUser, forceLoadAll: !_isPharmacyUser);
+                        medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: !authViewModel.isPharmacy);
                       },
                       color: const Color(0xFF636AE8),
                       backgroundColor: Colors.white.withOpacity(0.8),
@@ -734,7 +717,7 @@ class _HomeScreenState extends State<HomeScreen>
                             final double totalHorizontalPadding = screenPadding.left + screenPadding.right;
                             final double totalSpacing = horizontalSpacing * 2;
                             final double cardWidth = (screenWidth > 1200) ? (screenWidth - totalHorizontalPadding - totalSpacing) / 3 : (screenWidth > 800) ? (screenWidth - totalHorizontalPadding - horizontalSpacing) / 2 : (screenWidth - totalHorizontalPadding);
-                            return _buildMedicineCard(medicine, cardWidth);
+                            return _buildMedicineCard(context, medicine, cardWidth);
                           }).toList(),
                         ),
                       ),
@@ -747,24 +730,24 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         floatingActionButton: Stack(
           children: <Widget>[
-            if (_isPharmacyUser)
+            if (authViewModel.isPharmacy)
               Positioned(
                 bottom: 0,
                 right: 0,
                 child: FloatingActionButton.extended(
                   heroTag: 'add_medicine_fab',
                   onPressed: () async {
-                    if (_currentPharmacyIdForUser != null && mounted) {
+                    if (authViewModel.activePharmacyId != null && mounted) {
                       final result = await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => AddMedicineScreen(
-                            pharmacyId: _currentPharmacyIdForUser!,
+                            pharmacyId: authViewModel.activePharmacyId!,
                           ),
                         ),
                       );
-                      if (result == true && mounted && _currentPharmacyIdForUser != null) {
-                        medicineViewModel.loadMedicines(pharmacyId: _currentPharmacyIdForUser);
+                      if (result == true && mounted) {
+                        medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId);
                       }
                     } else if(mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -784,7 +767,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             Positioned(
-              bottom: _isPharmacyUser ? 80.0 : 0.0,
+              bottom: authViewModel.isPharmacy ? 80.0 : 0.0,
               right: 0,
               child: FloatingActionButton(
                 heroTag: 'chat_ai_fab',

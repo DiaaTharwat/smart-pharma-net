@@ -1,10 +1,10 @@
-// lib/view/Screens/add_pharmacy_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart'; // Import PharmacyModel
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart'; // ========== Fix Start: Added Import ==========
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
 import 'package:smart_pharma_net/view/Screens/available_pharmacy_screen.dart';
 import 'package:smart_pharma_net/view/Screens/admin_login_screen.dart';
@@ -137,7 +137,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
               ],
             ),
             backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.fixed, // تم التعديل هنا
+            behavior: SnackBarBehavior.fixed,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
             ),
@@ -156,6 +156,9 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
 
       try {
         final pharmacyViewModel = Provider.of<PharmacyViewModel>(context, listen: false);
+        // ========== Fix Start ==========
+        final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+        // ========== Fix End ==========
         final latitude = double.parse(_latitudeController.text);
         final longitude = double.parse(_longitudeController.text);
 
@@ -169,6 +172,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
             latitude: latitude,
             longitude: longitude,
             password: _passwordController.text.isNotEmpty ? _passwordController.text : null,
+            authViewModel: authViewModel, // ========== Fix Start ==========
           );
         } else {
           // ============ ADD LOGIC ============
@@ -180,6 +184,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
             longitude: longitude,
             password: _passwordController.text,
             confirmPassword: _confirmPasswordController.text,
+            authViewModel: authViewModel, // ========== Fix Start ==========
           );
         }
 
@@ -194,13 +199,12 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
                 ],
               ),
               backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.fixed, // تم التعديل هنا
+              behavior: SnackBarBehavior.fixed,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
           );
-          // Go back to the previous screen with a result to indicate success
           Navigator.pop(context, true);
         }
       } catch (e) {
@@ -230,7 +234,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
                 ],
               ),
               backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.fixed, // تم التعديل هنا
+              behavior: SnackBarBehavior.fixed,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -367,7 +371,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        Navigator.pop(context, false); // Return false if no changes were made
+        Navigator.pop(context, false);
         return false;
       },
       child: Scaffold(

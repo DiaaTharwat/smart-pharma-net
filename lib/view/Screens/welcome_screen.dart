@@ -1,5 +1,3 @@
-// lib/view/Screens/welcome_screen.dart
-
 import 'dart:math' as math; // The necessary import
 
 import 'package:flutter/material.dart';
@@ -7,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:simple_animations/simple_animations.dart';
 import 'package:smart_pharma_net/view/Screens/admin_login_screen.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
+import 'package:smart_pharma_net/view/Screens/pharmacy_login_screen.dart'; // <<< تم إضافة هذا السطر
 import 'package:smart_pharma_net/view/Screens/signup_admin_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
@@ -128,6 +127,24 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 },
               ),
               const SizedBox(height: 16),
+              // =========================  بداية التعديل =========================
+              PulsingActionButton(
+                label: 'Pharmacy',
+                leadingIcon: Icons.local_pharmacy,
+                buttonColor: const Color(0xFF00A86B), // A shade of teal/green
+                shadowBaseColor: const Color(0xFF00A86B),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const PharmacyLoginScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              // =========================  نهاية التعديل =========================
               PulsingActionButton(
                 label: 'User',
                 leadingIcon: Icons.person,

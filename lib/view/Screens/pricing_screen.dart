@@ -1,4 +1,3 @@
-// lib/view/Screens/pricing_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/viewmodels/subscription_viewmodel.dart';
@@ -513,7 +512,9 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                         const SizedBox(height: 32),
                         authViewModel.canActAsPharmacy
                             ? Text(
-                          'Managing subscription for: ${authViewModel.currentPharmacyName}',
+                          // ========== Fix Start ==========
+                          'Managing subscription for: ${authViewModel.activePharmacyName}',
+                          // ========== Fix End ==========
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold),
                         )

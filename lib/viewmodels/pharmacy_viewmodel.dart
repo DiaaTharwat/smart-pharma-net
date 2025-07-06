@@ -1,9 +1,9 @@
-// lib/viewmodels/pharmacy_viewmodel.dart
 import 'package:flutter/foundation.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/repositories/pharmacy_repository.dart';
 import 'package:smart_pharma_net/models/medicine_model.dart';
 import 'package:smart_pharma_net/repositories/medicine_repository.dart';
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart'; // <<< تم إضافة هذا السطر
 
 class PharmacyViewModel extends ChangeNotifier {
   final PharmacyRepository _pharmacyRepository;
@@ -28,6 +28,7 @@ class PharmacyViewModel extends ChangeNotifier {
     required double longitude,
     required String password,
     required String confirmPassword,
+    required AuthViewModel authViewModel, // <<< تم إضافة هذا السطر
   }) async {
     try {
       _isLoading = true;
@@ -44,7 +45,8 @@ class PharmacyViewModel extends ChangeNotifier {
       };
 
       await _pharmacyRepository.addPharmacy(pharmacyData);
-      await loadPharmacies(searchQuery: '');
+      // بعد الإضافة، قم بتحديث القائمة
+      await loadPharmacies(searchQuery: '', authViewModel: authViewModel);
 
       _isLoading = false;
       notifyListeners();
@@ -56,7 +58,6 @@ class PharmacyViewModel extends ChangeNotifier {
     }
   }
 
-  // ==================== NEW METHOD ====================
   Future<void> updatePharmacy({
     required String id,
     required String name,
@@ -64,7 +65,8 @@ class PharmacyViewModel extends ChangeNotifier {
     required String licenseNumber,
     required double latitude,
     required double longitude,
-    String? password, // Password is optional on update
+    required AuthViewModel authViewModel, // <<< تم إضافة هذا السطر
+    String? password,
   }) async {
     try {
       _isLoading = true;
@@ -76,12 +78,11 @@ class PharmacyViewModel extends ChangeNotifier {
         'license_number': licenseNumber.trim(),
         'latitude': latitude.toString(),
         'longitude': longitude.toString(),
-        // Only include password if it's not null and not empty
         if (password != null && password.isNotEmpty) 'password': password,
       };
 
       await _pharmacyRepository.updatePharmacy(id, pharmacyData);
-      await loadPharmacies(searchQuery: ''); // Refresh the list
+      await loadPharmacies(searchQuery: '', authViewModel: authViewModel);
 
     } catch (e) {
       _error = e.toString();
@@ -91,28 +92,47 @@ class PharmacyViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
-  // ===================================================
 
-  Future<void> loadPharmacies({required String searchQuery}) async {
+  // =========================  بداية التعديل النهائي =========================
+  Future<void> loadPharmacies({
+    required String searchQuery,
+    required AuthViewModel authViewModel,
+  }) async {
     _isLoading = true;
     _error = '';
-    notifyListeners();
+    // notifyListeners(); // لا داعي لها هنا لتجنب وميض الواجهة
 
     try {
-      _pharmacies = await _pharmacyRepository.getAllPharmacies();
-      if (searchQuery.isNotEmpty) {
-        _pharmacies = _pharmacies
-            .where((pharmacy) =>
-            pharmacy.name.toLowerCase().contains(searchQuery.toLowerCase()))
-            .toList();
+      // تحقق من دور المستخدم من الـ AuthViewModel
+      if (authViewModel.isPharmacy) {
+        // إذا كان المستخدم صيدلية، قم بتحميل بياناته فقط
+        final pharmacyId = authViewModel.activePharmacyId;
+        if (pharmacyId != null) {
+          final singlePharmacy = await _pharmacyRepository.getPharmacyDetails(pharmacyId);
+          _pharmacies = [singlePharmacy]; // ضع الصيدلية الوحيدة في القائمة
+        } else {
+          _pharmacies = []; // إذا لم يوجد ID، أفرغ القائمة
+          _error = "Could not find pharmacy ID for the logged in user.";
+        }
+      } else {
+        // إذا كان المستخدم Owner، قم بتحميل كل الصيدليات
+        _pharmacies = await _pharmacyRepository.getAllPharmacies();
+        if (searchQuery.isNotEmpty) {
+          _pharmacies = _pharmacies
+              .where((pharmacy) =>
+              pharmacy.name.toLowerCase().contains(searchQuery.toLowerCase()))
+              .toList();
+        }
       }
     } catch (e) {
       _error = e.toString();
+      _pharmacies = []; // أفرغ القائمة في حالة حدوث خطأ
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+  // =========================  نهاية التعديل النهائي =========================
 
   Future<PharmacyModel> getPharmacyDetails(String id) async {
     try {

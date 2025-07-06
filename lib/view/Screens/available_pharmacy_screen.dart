@@ -1,16 +1,15 @@
-// lib/view/Screens/available_pharmacy_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
-// import 'package:smart_pharma_net/view/Screens/pharmacy_login_screen.dart'; // لم نعد بحاجة إليه هنا
+import 'package:smart_pharma_net/view/Screens/welcome_screen.dart'; // ========== Fix Start: Added Import ==========
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/view/Screens/add_pharmacy_screen.dart';
 import 'package:smart_pharma_net/view/Screens/pharmacy_details_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
-import 'package:smart_pharma_net/view/Screens/medicine_screen.dart'; // --- إضافة جديدة ---
+import 'package:smart_pharma_net/view/Screens/medicine_screen.dart';
 
 class AvailablePharmaciesScreen extends StatefulWidget {
   const AvailablePharmaciesScreen({super.key});
@@ -26,7 +25,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  bool _isAdmin = false;
 
   @override
   void initState() {
@@ -56,19 +54,20 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
     _controller.forward();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadPharmacies();
-      _checkUserRole();
+      _loadDataBasedOnRole();
     });
   }
 
-  Future<void> _checkUserRole() async {
+  Future<void> _loadDataBasedOnRole() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    final userRole = await authViewModel.getUserRole();
-    if (mounted) {
-      setState(() {
-        _isAdmin = userRole == 'admin';
-      });
-    }
+    final pharmacyViewModel = Provider.of<PharmacyViewModel>(context, listen: false);
+
+    // ========== Fix Start ==========
+    await pharmacyViewModel.loadPharmacies(
+      searchQuery: _searchController.text.trim(),
+      authViewModel: authViewModel,
+    );
+    // ========== Fix End ==========
   }
 
   @override
@@ -78,15 +77,15 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
     super.dispose();
   }
 
-  Future<void> _loadPharmacies() async {
-    final pharmacyViewModel =
-    Provider.of<PharmacyViewModel>(context, listen: false);
-    pharmacyViewModel.loadPharmacies(searchQuery: _searchController.text.trim());
+  Future<void> _reloadData() async {
+    await _loadDataBasedOnRole();
   }
 
   void _goToAdminHome() {
-    // التأكد من إيقاف أي وضع تقمص شخصية عند العودة للشاشة الرئيسية
-    context.read<AuthViewModel>().stopImpersonation();
+    final authViewModel = context.read<AuthViewModel>();
+    if (authViewModel.isImpersonating) {
+      authViewModel.stopImpersonation();
+    }
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -94,8 +93,9 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
     );
   }
 
-  // --- تم تعديل هذه الدالة بالكامل ---
-  Widget _buildPharmacyCard(PharmacyModel pharmacy, int index) {
+  Widget _buildPharmacyCard(PharmacyModel pharmacy, int index, AuthViewModel authViewModel) {
+    final canManage = authViewModel.isAdmin || authViewModel.isPharmacy;
+
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
@@ -114,18 +114,12 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
               ),
             ],
           ),
-          // تم تغيير الهدف من الضغط على الكارت
-          // أصبح الآن يقوم بتفعيل وضع التقمص والانتقال لشاشة الأدوية
           child: InkWell(
-            onTap: () async {
-              final authViewModel = context.read<AuthViewModel>();
-              await authViewModel.impersonatePharmacy(pharmacy);
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MedicineScreen()),
-                );
-              }
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PharmacyDetailsScreen(pharmacy: pharmacy)),
+              );
             },
             borderRadius: BorderRadius.circular(20),
             child: Container(
@@ -171,7 +165,7 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                           ],
                         ),
                       ),
-                      if (_isAdmin)
+                      if (canManage)
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert, color: Colors.white),
                           color: const Color(0xFF0F0F1A),
@@ -194,7 +188,7 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                                 ),
                               );
                               if (result == true && mounted) {
-                                _loadPharmacies();
+                                _reloadData();
                               }
                             } else if (value == 'delete') {
                               final confirmDelete = await showDialog<bool>(
@@ -215,18 +209,23 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                               );
 
                               if (confirmDelete == true && mounted) {
+                                final pharmacyViewModel = context.read<PharmacyViewModel>();
                                 try {
-                                  await context.read<PharmacyViewModel>().deletePharmacy(pharmacy.id);
-                                  if (mounted) {
+                                  await pharmacyViewModel.deletePharmacy(pharmacy.id);
+
+                                  if (authViewModel.isPharmacy) {
+                                    await authViewModel.logout();
+                                    if(mounted) {
+                                      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const WelcomeScreen()), (route) => false);
+                                    }
+                                  } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text('Pharmacy deleted successfully'),
                                         backgroundColor: Colors.green,
-                                        behavior: SnackBarBehavior.fixed,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                                       ),
                                     );
-                                    _loadPharmacies();
+                                    _reloadData();
                                   }
                                 } catch (e) {
                                   if (mounted) {
@@ -234,8 +233,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                                       SnackBar(
                                         content: Text('Failed to delete pharmacy: ${e.toString()}'),
                                         backgroundColor: Colors.red,
-                                        behavior: SnackBarBehavior.fixed,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                                       ),
                                     );
                                   }
@@ -243,7 +240,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                               }
                             }
                           },
-                          // تم إضافة خيار "التفاصيل"
                           itemBuilder: (context) => [
                             PopupMenuItem(
                               value: 'details',
@@ -298,20 +294,19 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                     ],
                   ),
                   const SizedBox(height: 20),
-                  // تم تغيير وظيفة الزر أيضًا
-                  PulsingActionButton(
-                    label: 'Manage Pharmacy',
-                    onTap: () async {
-                      final authViewModel = context.read<AuthViewModel>();
-                      await authViewModel.impersonatePharmacy(pharmacy);
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const MedicineScreen()),
-                        );
-                      }
-                    },
-                  ),
+                  if(authViewModel.isAdmin)
+                    PulsingActionButton(
+                      label: 'Manage Pharmacy Medicines',
+                      onTap: () async {
+                        await authViewModel.impersonatePharmacy(pharmacy);
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const MedicineScreen()),
+                          );
+                        }
+                      },
+                    ),
                 ],
               ),
             ),
@@ -324,6 +319,7 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
   @override
   Widget build(BuildContext context) {
     final pharmacyViewModel = Provider.of<PharmacyViewModel>(context);
+    final authViewModel = Provider.of<AuthViewModel>(context);
 
     return WillPopScope(
       onWillPop: () async {
@@ -354,19 +350,14 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                           IconButton(
                             icon: const Icon(Icons.menu, color: Colors.white, size: 28),
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const MenuBarScreen(),
-                                ),
-                              );
+                              Navigator.of(context).pop();
                             },
                           ),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Available Pharmacies',
-                              style: TextStyle(
-                                fontSize: 26,
+                              authViewModel.isAdmin ? 'Available Pharmacies' : 'My Pharmacy Details',
+                              style: const TextStyle(
+                                fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                                 shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
@@ -376,25 +367,30 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                           ),
                           IconButton(
                             icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
-                            onPressed: () => _loadPharmacies(),
+                            onPressed: () => _reloadData(),
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          child: GlowingTextField(
-                            controller: _searchController,
-                            hintText: 'Search pharmacies...',
-                            icon: Icons.search,
-                            onChanged: (value) {
-                              pharmacyViewModel.loadPharmacies(searchQuery: value);
-                            },
+                      if(authViewModel.isAdmin)
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: SlideTransition(
+                            position: _slideAnimation,
+                            child: GlowingTextField(
+                              controller: _searchController,
+                              hintText: 'Search pharmacies...',
+                              icon: Icons.search,
+                              onChanged: (value) {
+                                // ========== Fix Start ==========
+                                pharmacyViewModel.loadPharmacies(
+                                    searchQuery: value,
+                                    authViewModel: authViewModel);
+                                // ========== Fix End ==========
+                              },
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -412,34 +408,26 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // ========== Fix Start: Changed Icon ==========
                       Icon(
-                        Icons.local_pharmacy,
+                        Icons.storefront,
                         size: 80,
                         color: Colors.grey.shade600,
                       ),
+                      // ========== Fix End ==========
                       const SizedBox(height: 20),
                       Text(
-                        _searchController.text.isNotEmpty ? 'No pharmacies match your search' : 'No pharmacies found',
+                        _searchController.text.isNotEmpty ? 'No pharmacies match your search' : 'No Pharmacy Data Found',
                         style: TextStyle(
                           fontSize: 20,
                           color: Colors.white.withOpacity(0.7),
                         ),
                       ),
-                      if (_searchController.text.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          'Try a different search term',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.5),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 )
                     : RefreshIndicator(
-                  onRefresh: _loadPharmacies,
+                  onRefresh: _reloadData,
                   color: const Color(0xFF636AE8),
                   backgroundColor: Colors.white.withOpacity(0.8),
                   child: ListView.builder(
@@ -447,7 +435,7 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                     itemCount: pharmacyViewModel.pharmacies.length,
                     itemBuilder: (context, index) {
                       final pharmacy = pharmacyViewModel.pharmacies[index];
-                      return _buildPharmacyCard(pharmacy, index);
+                      return _buildPharmacyCard(pharmacy, index, authViewModel);
                     },
                   ),
                 ),
@@ -455,7 +443,7 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
             ],
           ),
         ),
-        floatingActionButton: _isAdmin
+        floatingActionButton: authViewModel.isAdmin
             ? FloatingActionButton.extended(
           onPressed: () async {
             final result = await Navigator.push(
@@ -465,7 +453,7 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
               ),
             );
             if (result == true) {
-              _loadPharmacies();
+              _reloadData();
             }
           },
           backgroundColor: const Color(0xFF636AE8),

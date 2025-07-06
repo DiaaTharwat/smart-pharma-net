@@ -1,12 +1,11 @@
-// lib/view/Screens/pharmacy_login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
 import 'package:smart_pharma_net/view/Screens/medicine_screen.dart';
 import 'package:smart_pharma_net/view/Screens/exchange_screen.dart';
 import 'package:smart_pharma_net/view/Screens/pricing_screen.dart';
-// Import the new common UI elements file
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 
 
@@ -17,13 +16,13 @@ enum PharmacyLoginTargetScreen {
 }
 
 class PharmacyLoginScreen extends StatefulWidget {
-  final String? pharmacyId; // Made optional
+  final String? pharmacyId;
   final bool isAdminViewing;
   final PharmacyLoginTargetScreen targetScreen;
 
   const PharmacyLoginScreen({
     Key? key,
-    this.pharmacyId, // Made optional
+    this.pharmacyId,
     this.isAdminViewing = false,
     this.targetScreen = PharmacyLoginTargetScreen.medicineScreen,
   }) : super(key: key);
@@ -80,6 +79,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
     if (widget.pharmacyId != null && widget.pharmacyId!.isNotEmpty) {
       try {
         final pharmacyViewModel = Provider.of<PharmacyViewModel>(context, listen: false);
+        final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
         final pharmacy = await pharmacyViewModel.getPharmacyDetails(widget.pharmacyId!);
         if (mounted) {
           setState(() {
@@ -110,21 +110,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
     super.dispose();
   }
 
-  String _getErrorMessage(dynamic error) {
-    final errorStr = error.toString().toLowerCase();
-    if (errorStr.contains('network')) {
-      return 'Network error. Please check your internet connection.';
-    } else if (errorStr.contains('timeout')) {
-      return 'Request timed out. Please try again.';
-    } else if (errorStr.contains('invalid credentials') || errorStr.contains('wrong pharmacy')) {
-      return 'Invalid pharmacy name or password.';
-    } else if (errorStr.contains('mismatch')) {
-      return 'Access denied. Please check your credentials.';
-    } else {
-      return error.toString().replaceAll('Exception: ', '');
-    }
-  }
-
+  // ========== Fix Start: Handling the String? return type correctly ==========
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -135,64 +121,41 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
       _isLoading = true;
     });
 
-    try {
-      final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
+    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
 
-      final loggedInPharmacyId = await authViewModel.pharmacyLogin(
-        name: _nameController.text.trim(),
-        password: _passwordController.text,
-        isAdminImpersonating: widget.isAdminViewing,
-      );
+    // The function now returns an error message string on failure, and null on success.
+    final String? errorResult = await authViewModel.pharmacyLogin(
+      name: _nameController.text.trim(),
+      password: _passwordController.text,
+    );
 
-      if (widget.pharmacyId != null && widget.pharmacyId!.isNotEmpty && loggedInPharmacyId.trim().toLowerCase() != widget.pharmacyId!.trim().toLowerCase()) {
-        throw Exception('Access denied. This account does not have permission to access this pharmacy.');
-      }
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
 
-      if (mounted) {
-        setState(() {
-          _errorMessage = null;
-          _isLoading = false;
-        });
-
+      // If errorResult is null, it means login was successful.
+      if (errorResult == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Login successful!'),
+            content: Text('Login successful! Welcome.'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.fixed,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
           ),
         );
 
-        if (widget.targetScreen == PharmacyLoginTargetScreen.exchangeScreen) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const ExchangeScreen(),
-            ),
-          );
-        } else if (widget.targetScreen == PharmacyLoginTargetScreen.pricingScreen) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const PricingScreen(),
-            ),
-          );
-        } else {
-          // --- الإصلاح النهائي هنا ---
-          // تم استدعاء `MedicineScreen` بدون أي متغيرات
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MedicineScreen(),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const MenuBarScreen(),
+          ),
+        );
+
+      } else {
+        // If there's an error string, this is the failure case.
         setState(() {
-          _errorMessage = _getErrorMessage(e);
-          _isLoading = false;
+          _errorMessage = errorResult;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -205,6 +168,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
       }
     }
   }
+  // ========== Fix End ==========
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +255,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
                             controller: _nameController,
                             hintText: 'Pharmacy Name',
                             icon: Icons.store,
-                            enabled: !_isLoading && (widget.pharmacyId == null || widget.pharmacyId!.isEmpty),
+                            enabled: !_isLoading,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Please enter pharmacy name';

@@ -1,4 +1,3 @@
-// lib/view/Screens/exchange_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
@@ -61,9 +60,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
 
   Future<void> _checkPharmacyAccessAndLoadMedicines() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-    // Use the new getter to check for access
     if (!authViewModel.canActAsPharmacy) {
-      // Logic for what happens if not logged in as a pharmacy or impersonating
     } else {
       context.read<ExchangeViewModel>().loadExchangeMedicines();
     }
@@ -178,10 +175,11 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                 ),
                                 Expanded(
                                   child: Text(
-                                    // --- إصلاح: تم استخدام المتغير الصحيح ---
+                                    // ========== Fix Start ==========
                                     authViewModel.canActAsPharmacy
-                                        ? 'Exchange for ${authViewModel.currentPharmacyName}'
+                                        ? 'Exchange for ${authViewModel.activePharmacyName}'
                                         : 'Medicine Exchange',
+                                    // ========== Fix End ==========
                                     style: const TextStyle(
                                       fontSize: 26,
                                       fontWeight: FontWeight.bold,

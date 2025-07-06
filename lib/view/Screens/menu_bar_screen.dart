@@ -1,4 +1,3 @@
-// lib/view/Screens/menu_bar_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
@@ -12,7 +11,6 @@ import 'package:smart_pharma_net/view/Screens/pharmacy_orders_screen.dart';
 import 'package:smart_pharma_net/view/Screens/pricing_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
-// --- إضافة جديدة ---
 import 'package:smart_pharma_net/view/Widgets/notification_icon.dart';
 
 
@@ -59,7 +57,8 @@ class _MenuBarScreenState extends State<MenuBarScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authViewModel = context.read<AuthViewModel>();
       if (authViewModel.isAdmin) {
-        context.read<PharmacyViewModel>().loadPharmacies(searchQuery: '');
+        context.read<PharmacyViewModel>().loadPharmacies(
+            searchQuery: '', authViewModel: authViewModel);
       }
     });
   }
@@ -106,7 +105,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
   }
 
   void _navigateTo(BuildContext context, Widget screen) {
-    Navigator.pop(context);
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
@@ -117,15 +115,15 @@ class _MenuBarScreenState extends State<MenuBarScreen>
     bool isDisabled = false,
     Color? iconColor,
   }) {
-    final color = isDisabled ? Colors.grey.shade700 : Colors.white;
-    final finalIconColor = iconColor ?? (isDisabled ? Colors.grey.shade700 : const Color(0xFF636AE8));
+    final color = isDisabled ? Colors.grey.shade600 : Colors.white;
+    final finalIconColor = iconColor ?? (isDisabled ? Colors.grey.shade600 : const Color(0xFF636AE8));
 
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: Opacity(
-          opacity: isDisabled ? 0.5 : 1.0,
+          opacity: isDisabled ? 0.6 : 1.0,
           child: ListTile(
             leading: Container(
               padding: const EdgeInsets.all(12),
@@ -140,7 +138,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: color),
             ),
             trailing: Icon(Icons.arrow_forward_ios, size: 20, color: color.withOpacity(0.7)),
-            onTap: onTap,
+            onTap: isDisabled ? null : onTap,
           ),
         ),
       ),
@@ -165,7 +163,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: authVm.isImpersonating ? authVm.impersonatedPharmacyId : 'owner_mode',
+          value: authVm.isImpersonating ? authVm.activePharmacyId : 'owner_mode',
           isExpanded: true,
           dropdownColor: const Color(0xFF0D0D1A),
           icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70),
@@ -186,7 +184,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
             if (newValue == 'owner_mode') {
               authVm.stopImpersonation();
             } else if (newValue != null) {
-              final selectedPharmacy = pharmacyVm.pharmacies.firstWhere((p) => p.id == newValue);
+              final selectedPharmacy = pharmacyVm.pharmacies.firstWhere((p) => p.id == newValue, orElse: () => pharmacyVm.pharmacies.first);
               authVm.impersonatePharmacy(selectedPharmacy);
             }
           },
@@ -215,11 +213,10 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       children: [
                         IconButton(
                           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 28),
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: (){ Navigator.of(context).pop(); },
                         ),
                         const Spacer(),
-                        // --- إضافة جديدة: إظهار أيقونة الإشعارات عند تقمص شخصية صيدلية ---
-                        if (authViewModel.isImpersonating)
+                        if (authViewModel.canActAsPharmacy)
                           const NotificationIcon(),
                       ],
                     ),
@@ -232,7 +229,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                             radius: 35,
                             backgroundColor: const Color(0xFF636AE8).withOpacity(0.5),
                             child: Icon(
-                              authViewModel.canActAsPharmacy ? Icons.storefront : Icons.admin_panel_settings,
+                              authViewModel.isAdmin ? Icons.admin_panel_settings : Icons.storefront,
                               size: 40,
                               color: Colors.white,
                             ),
@@ -243,9 +240,9 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  authViewModel.canActAsPharmacy
-                                      ? authViewModel.currentPharmacyName ?? 'Pharmacy Mode'
-                                      : 'Welcome, Owner',
+                                  authViewModel.isPharmacy
+                                      ? authViewModel.activePharmacyName ?? 'Pharmacy'
+                                      : (authViewModel.isImpersonating ? authViewModel.activePharmacyName ?? 'Pharmacy Mode' : 'Welcome, Owner'),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 22,
@@ -254,7 +251,9 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  authViewModel.isImpersonating ? 'Owner (Impersonating)' : (authViewModel.isAdmin ? 'Owner' : 'Pharmacy'),
+                                  authViewModel.isImpersonating
+                                      ? 'Owner (Impersonating)'
+                                      : (authViewModel.isAdmin ? 'Owner Account' : 'Pharmacy Account'),
                                   style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
                                 ),
                               ],
@@ -267,26 +266,12 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                 ),
               ),
             ),
+
+            // ========== Fix Start: Restructured Menu Logic ==========
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 children: [
-                  if (authViewModel.isAdmin && !authViewModel.isPharmacy)
-                    _buildPharmacySelector(context),
-
-                  if (authViewModel.isImpersonating)
-                    _buildMenuItem(
-                      icon: Icons.person_off_outlined,
-                      title: 'Return to Owner Mode',
-                      onTap: () {
-                        context.read<AuthViewModel>().stopImpersonation();
-                      },
-                      iconColor: Colors.orangeAccent,
-                    ),
-
-                  if (authViewModel.isAdmin && !authViewModel.isPharmacy)
-                    Divider(color: Colors.white.withOpacity(0.2), height: 40),
-
                   _buildMenuItem(
                     icon: Icons.home,
                     title: 'Home',
@@ -297,38 +282,65 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       );
                     },
                   ),
-                  _buildMenuItem(
-                    icon: Icons.swap_horiz,
-                    title: 'Exchange',
-                    isDisabled: !authViewModel.canActAsPharmacy,
-                    onTap: authViewModel.canActAsPharmacy
-                        ? () => _navigateTo(context, const ExchangeScreen())
-                        : _showSelectPharmacyDialog,
-                  ),
-                  _buildMenuItem(
-                    icon: Icons.star,
-                    title: 'Pricing & Subscriptions',
-                    isDisabled: !authViewModel.canActAsPharmacy,
-                    onTap: authViewModel.canActAsPharmacy
-                        ? () => _navigateTo(context, const PricingScreen())
-                        : _showSelectPharmacyDialog,
-                  ),
-                  if (authViewModel.canActAsPharmacy)
+
+                  if (authViewModel.isAdmin) ...[
+                    // --- خيارات الـ Owner ---
+                    _buildPharmacySelector(context),
+                    _buildMenuItem(
+                      icon: Icons.store_mall_directory,
+                      title: 'Manage Pharmacies',
+                      onTap: () => _navigateTo(context, const AvailablePharmaciesScreen()),
+                    ),
+                    Divider(color: Colors.white.withOpacity(0.2), height: 20),
+                    // أزرار تظهر دائمًا ولكنها تكون معطلة
+                    _buildMenuItem(
+                      icon: Icons.swap_horiz,
+                      title: 'Exchange',
+                      isDisabled: !authViewModel.isImpersonating,
+                      onTap: authViewModel.isImpersonating
+                          ? () => _navigateTo(context, const ExchangeScreen())
+                          : _showSelectPharmacyDialog,
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.star,
+                      title: 'Subscriptions',
+                      isDisabled: !authViewModel.isImpersonating,
+                      onTap: authViewModel.isImpersonating
+                          ? () => _navigateTo(context, const PricingScreen())
+                          : _showSelectPharmacyDialog,
+                    ),
+                    // يظهر فقط عند تقمص دور صيدلية
+                    if (authViewModel.isImpersonating)
+                      _buildMenuItem(
+                        icon: Icons.shopping_cart,
+                        title: 'Incoming Orders',
+                        onTap: () => _navigateTo(context, const PharmacyOrdersScreen()),
+                      ),
+                  ] else if (authViewModel.isPharmacy) ...[
+                    // --- خيارات الصيدلية ---
+                    _buildMenuItem(
+                      icon: Icons.store,
+                      title: 'My Pharmacy Details',
+                      onTap: () => _navigateTo(context, const AvailablePharmaciesScreen()),
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.swap_horiz,
+                      title: 'Exchange',
+                      onTap: () => _navigateTo(context, const ExchangeScreen()),
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.star,
+                      title: 'Subscriptions',
+                      onTap: () => _navigateTo(context, const PricingScreen()),
+                    ),
                     _buildMenuItem(
                       icon: Icons.shopping_cart,
                       title: 'My Incoming Orders',
                       onTap: () => _navigateTo(context, const PharmacyOrdersScreen()),
                     ),
-
-                  if(authViewModel.isAdmin && !authViewModel.isPharmacy)
-                    _buildMenuItem(
-                      icon: Icons.local_pharmacy,
-                      title: 'Available Pharmacies',
-                      onTap: () => _navigateTo(context, const AvailablePharmaciesScreen()),
-                    ),
+                  ],
 
                   Divider(color: Colors.white.withOpacity(0.2), height: 40),
-
                   _buildMenuItem(
                     icon: Icons.logout,
                     title: 'Logout',
@@ -338,6 +350,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                 ],
               ),
             ),
+            // ========== Fix End ==========
           ],
         ),
       ),

@@ -1,5 +1,3 @@
-// lib/viewmodels/auth_viewmodel.dart
-
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
@@ -13,38 +11,40 @@ class AuthViewModel extends BaseViewModel {
 
   bool _isAdmin = false;
   bool _isPharmacy = false;
-
+  String? _loggedInPharmacyId;
+  String? _loggedInPharmacyName;
   bool _isImpersonating = false;
   String? _impersonatedPharmacyId;
   String? _impersonatedPharmacyName;
-
-  String? _passwordBasedImpersonatingName;
 
   AuthViewModel(this._authRepository, this._apiService);
 
   bool get isAdmin => _isAdmin;
   bool get isPharmacy => _isPharmacy;
   bool get isImpersonating => _isImpersonating;
-  String? get impersonatedPharmacyId => _impersonatedPharmacyId;
-
   bool get canActAsPharmacy => _isPharmacy || _isImpersonating;
 
-  String? get currentPharmacyName => _isImpersonating ? _impersonatedPharmacyName : _passwordBasedImpersonatingName;
+  String? get activePharmacyId {
+    if (_isImpersonating) return _impersonatedPharmacyId;
+    if (_isPharmacy) return _loggedInPharmacyId;
+    return null;
+  }
 
-  bool get isNormalUser => !_isAdmin && !_isPharmacy;
+  String? get activePharmacyName {
+    if (_isImpersonating) return _impersonatedPharmacyName;
+    if (_isPharmacy) return _loggedInPharmacyName;
+    return null;
+  }
 
   Future<void> impersonatePharmacy(PharmacyModel pharmacy) async {
     if (!_isAdmin) return;
-
-    print('Owner is starting impersonation of: ${pharmacy.name} (ID: ${pharmacy.id})');
     _isImpersonating = true;
-    _impersonatedPharmacyId = pharmacy.id;
+    _impersonatedPharmacyId = pharmacy.id.toString();
     _impersonatedPharmacyName = pharmacy.name;
     notifyListeners();
   }
 
   Future<void> stopImpersonation() async {
-    print('Owner is stopping impersonation.');
     _isImpersonating = false;
     _impersonatedPharmacyId = null;
     _impersonatedPharmacyName = null;
@@ -62,14 +62,12 @@ class AuthViewModel extends BaseViewModel {
         if (accessToken == null || refreshToken == null) {
           throw Exception('Invalid response: missing tokens');
         }
-        await _authRepository.saveTokens(
-            accessToken,
-            refreshToken,
-            role: 'admin'
-        );
+        await _authRepository.saveTokens(accessToken, refreshToken, role: 'admin');
         _isAdmin = true;
         _isPharmacy = false;
         _isImpersonating = false;
+        _loggedInPharmacyId = null;
+        _loggedInPharmacyName = null;
         _impersonatedPharmacyId = null;
         _impersonatedPharmacyName = null;
         notifyListeners();
@@ -84,37 +82,28 @@ class AuthViewModel extends BaseViewModel {
     }
   }
 
-  Future<String> pharmacyLogin({
+  // ========== Fix Start: Changed return type to String? ==========
+  Future<String?> pharmacyLogin({
     required String name,
     required String password,
-    bool isAdminImpersonating = false,
   }) async {
     setLoading(true);
     setError(null);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      if (isAdminImpersonating) {
-        final currentAdminAccessToken = prefs.getString(ApiService.tokenKey);
-        final currentAdminRefreshToken = prefs.getString(ApiService.refreshTokenKey);
-        if (currentAdminAccessToken != null && currentAdminRefreshToken != null) {
-          await prefs.setString(ApiService.adminTokenKey, currentAdminAccessToken);
-          await prefs.setString(ApiService.adminRefreshTokenKey, currentAdminRefreshToken);
-        }
-      }
-
       final response = await _apiService.pharmacyLogin(name, password);
 
       if (response != null) {
         final pharmacyId = response['id']?.toString();
         final pharmacyNameReturned = response['name']?.toString();
+        final accessToken = response['access'] as String?;
+        final refreshToken = response['refresh'] as String?;
+
         if (pharmacyId == null || pharmacyId.isEmpty) {
-          throw Exception('Access denied. This account does not have permission to access this pharmacy.');
+          throw Exception('Pharmacy login failed: No pharmacy ID returned.');
         }
-        if (pharmacyNameReturned == null || pharmacyNameReturned.toLowerCase() != name.toLowerCase()) {
-          throw Exception('Invalid pharmacy credentials - wrong pharmacy name returned');
+        if (accessToken == null || refreshToken == null) {
+          throw Exception('Pharmacy login failed: Missing tokens.');
         }
-        final accessToken = response['access'];
-        final refreshToken = response['refresh'];
 
         await _authRepository.saveTokens(
           accessToken,
@@ -124,20 +113,39 @@ class AuthViewModel extends BaseViewModel {
           pharmacyName: pharmacyNameReturned,
         );
 
-        _isAdmin = isAdminImpersonating;
+        _isAdmin = false;
         _isPharmacy = true;
-        _passwordBasedImpersonatingName = pharmacyNameReturned;
+        _isImpersonating = false;
+        _loggedInPharmacyId = pharmacyId;
+        _loggedInPharmacyName = pharmacyNameReturned;
+        _impersonatedPharmacyId = null;
+        _impersonatedPharmacyName = null;
+
         notifyListeners();
-        return pharmacyId;
+        return null; // Return null on success
       } else {
         throw Exception('Login failed: Invalid response');
       }
     } catch (e) {
-      setError(e.toString());
-      rethrow;
+      final errorMessage = e.toString().replaceAll('Exception: ', '');
+      setError(errorMessage);
+      return errorMessage; // Return error message on failure
     } finally {
       setLoading(false);
     }
+  }
+  // ========== Fix End ==========
+
+  Future<void> logout() async {
+    await _authRepository.logout();
+    _isAdmin = false;
+    _isPharmacy = false;
+    _isImpersonating = false;
+    _impersonatedPharmacyId = null;
+    _impersonatedPharmacyName = null;
+    _loggedInPharmacyId = null;
+    _loggedInPharmacyName = null;
+    notifyListeners();
   }
 
   Future<void> restoreAdminSession() async {
@@ -157,7 +165,7 @@ class AuthViewModel extends BaseViewModel {
         await prefs.remove(ApiService.adminRefreshTokenKey);
         _isAdmin = true;
         _isPharmacy = false;
-        _passwordBasedImpersonatingName = null;
+        _loggedInPharmacyName = null;
         notifyListeners();
       } else {
         await logout();
@@ -169,17 +177,6 @@ class AuthViewModel extends BaseViewModel {
     } finally {
       setLoading(false);
     }
-  }
-
-  Future<void> logout() async {
-    await _authRepository.logout();
-    _isAdmin = false;
-    _isPharmacy = false;
-    _isImpersonating = false;
-    _impersonatedPharmacyId = null;
-    _impersonatedPharmacyName = null;
-    _passwordBasedImpersonatingName = null;
-    notifyListeners();
   }
 
   Future<bool> register({
@@ -230,15 +227,16 @@ class AuthViewModel extends BaseViewModel {
 
   Future<bool> isLoggedIn() async {
     final isValid = await _authRepository.isLoggedIn();
-    final prefs = await SharedPreferences.getInstance();
-    final currentRole = prefs.getString(ApiService.userRoleKey);
-    final hasPersistedAdminTokens = prefs.containsKey(ApiService.adminTokenKey);
-
     if (isValid) {
+      final prefs = await SharedPreferences.getInstance();
+      final currentRole = prefs.getString(ApiService.userRoleKey);
+
       if (currentRole == 'pharmacy') {
         _isPharmacy = true;
-        _passwordBasedImpersonatingName = prefs.getString(ApiService.pharmacyNameKey);
-        _isAdmin = hasPersistedAdminTokens;
+        _isAdmin = false;
+        _isImpersonating = false;
+        _loggedInPharmacyId = prefs.getString(ApiService.pharmacyIdKey);
+        _loggedInPharmacyName = prefs.getString(ApiService.pharmacyNameKey);
       } else if (currentRole == 'admin') {
         _isAdmin = true;
         _isPharmacy = false;
@@ -247,37 +245,21 @@ class AuthViewModel extends BaseViewModel {
         _isPharmacy = false;
       }
     } else {
-      _isAdmin = false;
-      _isPharmacy = false;
-      _isImpersonating = false;
-      await prefs.remove(ApiService.adminTokenKey);
-      await prefs.remove(ApiService.adminRefreshTokenKey);
+      await logout();
     }
     notifyListeners();
     return isValid;
   }
 
-  Future<String?> getUserRole() async {
-    return _apiService.userRole;
-  }
-
   Future<String?> getPharmacyId() async {
-    if (_isImpersonating && _impersonatedPharmacyId != null) {
-      return _impersonatedPharmacyId;
-    }
-    if (_isPharmacy) {
-      return _apiService.getPharmacyId();
-    }
-    return null;
+    return activePharmacyId;
   }
 
   Future<String?> getPharmacyName() async {
-    if (_isImpersonating && _impersonatedPharmacyName != null) {
-      return _impersonatedPharmacyName;
-    }
-    if (_isPharmacy) {
-      return _apiService.getPharmacyName();
-    }
-    return null;
+    return activePharmacyName;
+  }
+
+  Future<String?> getUserRole() async {
+    return _apiService.userRole;
   }
 }
