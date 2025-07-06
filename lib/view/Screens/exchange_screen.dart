@@ -4,7 +4,6 @@ import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/exchange_viewmodel.dart';
-import 'package:smart_pharma_net/view/Screens/pharmacy_login_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/notification_icon.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
@@ -175,11 +174,9 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                 ),
                                 Expanded(
                                   child: Text(
-                                    // ========== Fix Start ==========
                                     authViewModel.canActAsPharmacy
                                         ? 'Exchange for ${authViewModel.activePharmacyName}'
                                         : 'Medicine Exchange',
-                                    // ========== Fix End ==========
                                     style: const TextStyle(
                                       fontSize: 26,
                                       fontWeight: FontWeight.bold,
@@ -187,6 +184,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                       shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
                                     ),
                                     textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 IconButton(
@@ -265,7 +263,10 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                               ),
                             );
                           }
-                          if (exchangeViewModel.exchangeMedicines.isEmpty) {
+
+                          final displayedMedicines = exchangeViewModel.exchangeMedicines;
+
+                          if (displayedMedicines.isEmpty) {
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -306,17 +307,29 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                               ),
                             );
                           }
+
+                          final screenPadding = const EdgeInsets.all(20.0);
+                          final horizontalSpacing = 20.0;
+                          final verticalSpacing = 20.0;
+
                           return RefreshIndicator(
                             onRefresh: () => exchangeViewModel.loadExchangeMedicines(),
                             color: const Color(0xFF636AE8),
                             backgroundColor: Colors.white.withOpacity(0.8),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(20),
-                              itemCount: exchangeViewModel.exchangeMedicines.length,
-                              itemBuilder: (context, index) {
-                                final medicine = exchangeViewModel.exchangeMedicines[index];
-                                return _buildExchangeMedicineCard(medicine);
-                              },
+                            child: SingleChildScrollView(
+                              padding: screenPadding,
+                              child: Wrap(
+                                spacing: horizontalSpacing,
+                                runSpacing: verticalSpacing,
+                                alignment: WrapAlignment.start,
+                                children: displayedMedicines.map((medicine) {
+                                  final double screenWidth = MediaQuery.of(context).size.width;
+                                  final double totalHorizontalPadding = screenPadding.left + screenPadding.right;
+                                  final double totalSpacing = horizontalSpacing * 2;
+                                  final double cardWidth = (screenWidth > 1200) ? (screenWidth - totalHorizontalPadding - totalSpacing) / 3 : (screenWidth > 800) ? (screenWidth - totalHorizontalPadding - horizontalSpacing) / 2 : (screenWidth - totalHorizontalPadding);
+                                  return _buildExchangeMedicineCard(medicine, cardWidth);
+                                }).toList(),
+                              ),
                             ),
                           );
                         },
@@ -332,115 +345,130 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     );
   }
 
-  Widget _buildExchangeMedicineCard(ExchangeMedicineModel medicine) {
+  // ========== بداية التعديل: تصميم الكارت الجديد ==========
+  Widget _buildExchangeMedicineCard(ExchangeMedicineModel medicine, double cardWidth) {
+    Widget imageWidget;
+    if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
+      imageWidget = Image.network(
+        medicine.imageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: 140,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.medication_liquid_outlined, size: 90, color: Color(0xFF636AE8)),
+      );
+    } else {
+      imageWidget = const Icon(Icons.medication_liquid_outlined, size: 90, color: Color(0xFF636AE8));
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      width: cardWidth,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F1A),
+        color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
         boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF636AE8).withOpacity(0.15),
-            blurRadius: 15,
-            spreadRadius: 2,
-          ),
+          BoxShadow(color: const Color(0xFF636AE8).withOpacity(0.15), blurRadius: 15, spreadRadius: 2),
         ],
       ),
-      child: InkWell(
-        onTap: () => _showBuyMedicineModal(medicine),
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: () => _showBuyMedicineModal(medicine),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF636AE8).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: const Icon(
-                      Icons.medication_outlined,
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    height: 140,
+                    decoration: BoxDecoration(color: const Color(0xFF636AE8).withOpacity(0.2)),
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        Text(
-                          medicine.medicineName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          child: imageWidget,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'From: ${medicine.pharmacyName}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.8),
+                        Positioned(
+                          top: 5, right: 5,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                            child: const Icon(Icons.swap_horiz, color: Colors.white, size: 16),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  Text(
-                    '\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF4CAF50),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(medicine.medicineName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.store_outlined, size: 12, color: Colors.white.withOpacity(0.7)),
+                            const SizedBox(width: 4),
+                            Expanded(child: Text('From: ${medicine.pharmacyName}', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)), overflow: TextOverflow.ellipsis)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.calendar_today_outlined, size: 11, color: Colors.white.withOpacity(0.7)),
+                            const SizedBox(width: 4),
+                            Text('Exp: ${medicine.medicineExpiryDate}', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('${medicine.medicineQuantityToSell} units', style: const TextStyle(fontSize: 13, color: Colors.white)),
+                            Text('\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}', style: const TextStyle(fontSize: 17, color: Color(0xFF4CAF50), fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.inventory_2_outlined, size: 20, color: Colors.white.withOpacity(0.7)),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Available: ${medicine.medicineQuantityToSell}',
-                        style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.7)),
-                      ),
-                    ],
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showBuyMedicineModal(medicine),
-                    icon: const Icon(Icons.shopping_cart_outlined, size: 20, color: Colors.white),
-                    label: const Text('Buy', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      elevation: 5,
-                      shadowColor: const Color(0xFF4CAF50).withOpacity(0.6),
-                    ),
-                  ),
-                ],
+            ),
+
+            // زر التبادل الجديد
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.swap_horiz_outlined, size: 18),
+                label: const Text('Exchange'),
+                onPressed: () => _showBuyMedicineModal(medicine),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF636AE8), // لون أساسي للتطبيق
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+  // ========== نهاية التعديل ==========
+
 
   void _showBuyMedicineModal(ExchangeMedicineModel medicine) {
     int quantityToBuy = 1;
@@ -452,7 +480,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
-              padding: const EdgeInsets.all(24),
+              padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24), // تعديل للوحة المفاتيح
               decoration: BoxDecoration(
                 color: const Color(0xFF0F0F1A),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
@@ -471,7 +499,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                     ),
                   ),
                   const Text(
-                    'Confirm Purchase',
+                    'Confirm Exchange',
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 24),

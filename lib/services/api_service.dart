@@ -1,3 +1,5 @@
+// lib/services/api_service.dart
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
@@ -938,4 +940,64 @@ class ApiService {
       rethrow;
     }
   }
+
+  // =========================================================================
+  // =================== START: USER SETTINGS API METHODS ====================
+  // =========================================================================
+
+  /// Fetches the current user's profile data.
+  /// Calls `GET /auth/users/me/`
+  Future<dynamic> getUserProfile() async {
+    const endpoint = 'auth/users/me/';
+    print('Calling GET user profile endpoint: $endpoint');
+    return authenticatedGet(endpoint);
+  }
+
+  /// Updates the current user's profile data.
+  /// Calls `PATCH /auth/users/me/`
+  Future<dynamic> updateUserProfile(Map<String, dynamic> data) async {
+    const endpoint = 'auth/users/me/';
+    print('Calling PATCH to update user profile endpoint: $endpoint');
+    return patch(endpoint, data);
+  }
+
+  /// Changes the current user's password.
+  /// Calls `POST /auth/users/set_password/`
+  Future<dynamic> changePassword(Map<String, dynamic> data) async {
+    const endpoint = 'auth/users/set_password/';
+    print('Calling POST to change password endpoint: $endpoint');
+    return post(endpoint, data);
+  }
+
+  // START OF FINAL FIX
+  /// Changes the current user's email.
+  /// This now calls the standard 'set_email' endpoint.
+  Future<dynamic> changeEmail(Map<String, dynamic> data) async {
+    const endpoint = 'auth/users/set_email/'; // Corrected endpoint
+    print('Calling POST to change email endpoint: $endpoint');
+    return post(endpoint, data);
+  }
+  // END OF FINAL FIX
+
+  /// Deletes the current user's account.
+  /// Calls `DELETE /auth/users/me/`
+  Future<dynamic> deleteAccount() async {
+    const endpoint = 'auth/users/me/';
+    print('Calling DELETE to remove user account endpoint: $endpoint');
+    // Using a custom authenticated delete that doesn't require an ID in the path
+    return _authenticatedRequest(() async {
+      final response = await _sendHttpRequest(
+        'DELETE',
+        Uri.parse(baseUrl + endpoint),
+        headers: pharmacyHeaders,
+      );
+      // Delete requests often return 204 No Content, which is a success.
+      if (response.statusCode == 204) return null;
+      return _parseResponse(response);
+    });
+  }
+
+// =========================================================================
+// ==================== END: USER SETTINGS API METHODS =====================
+// =========================================================================
 }

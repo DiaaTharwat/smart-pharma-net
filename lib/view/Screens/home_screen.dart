@@ -101,7 +101,15 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<LatLng?> _getUserLocation() async {
-    return null;
+    // This is a placeholder. You should implement actual location fetching logic here.
+    // For example, using the geolocator package:
+    try {
+      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      return LatLng(position.latitude, position.longitude);
+    } catch (e) {
+      print("Failed to get location: $e");
+      return null;
+    }
   }
 
   Future<void> _handleDeleteMedicine(BuildContext context, MedicineModel medicine) async {
@@ -166,14 +174,26 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildMedicineCard(BuildContext context, MedicineModel medicine, double cardWidth) {
     final authViewModel = context.watch<AuthViewModel>();
+    final pharmacyViewModel = context.watch<PharmacyViewModel>();
 
-    // ========== Fix Start: Corrected and final logic for showing management buttons ==========
-    // The buttons appear ONLY if the user is actively acting as the pharmacy that owns this medicine.
-    final bool canManage = authViewModel.canActAsPharmacy && medicine.pharmacyId == authViewModel.activePharmacyId;
+    // ========== بداية التعديل: منطق جديد ومحسن لإظهار أزرار التحكم ==========
+    bool canManage = false;
 
-    // The buy button appears ONLY for a normal user (not admin, not pharmacy).
+    // الحالة الأولى: المستخدم هو مالك (Admin) وليس في وضع انتحال شخصية (impersonating)
+    // في هذه الحالة، يمكنه التحكم في أدوية أي صيدلية تابعة له.
+    if (authViewModel.isAdmin && !authViewModel.isImpersonating) {
+      final ownedPharmacyIds = pharmacyViewModel.pharmacies.map((p) => p.id).toSet();
+      canManage = ownedPharmacyIds.contains(medicine.pharmacyId);
+    }
+    // الحالة الثانية: المستخدم يتصرف كصيدلية (إما أنه سجل الدخول كصيدلية، أو كمالك ينتحل شخصية صيدلية)
+    // في هذه الحالة، يمكنه التحكم فقط في أدوية الصيدلية النشطة حاليًا.
+    else if (authViewModel.canActAsPharmacy) {
+      canManage = medicine.pharmacyId == authViewModel.activePharmacyId;
+    }
+
+    // زر الشراء يظهر فقط للمستخدم العادي (ليس مالكًا وليس صيدلية)
     final bool isNormalUser = !authViewModel.isAdmin && !authViewModel.isPharmacy;
-    // ========== Fix End ==========
+    // ========== نهاية التعديل ==========
 
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {

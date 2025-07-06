@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:simple_animations/simple_animations.dart'; // IMPORTANT: Ensure this import is present
+import 'package:simple_animations/simple_animations.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
-import 'package:smart_pharma_net/view/Screens/home_screen.dart';
+import 'package:smart_pharma_net/view/Screens/welcome_screen.dart'; // <<<--- تم التأكد من وجود هذا السطر
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 
 
@@ -92,23 +92,28 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Registration successful!'),
+              content: Text('Registration successful! Please log in.'),
               backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating, // Consistent styling
+              behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
             ),
           );
+
+          // ========== START OF FIX ==========
+          // Redirect to the main WelcomeScreen to allow the new user to log in
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()), // تم التعديل هنا
                 (route) => false,
           );
+          // ========== END OF FIX ==========
+
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(authViewModel.errorMessage ?? 'Registration failed.'),
               backgroundColor: Colors.redAccent,
-              behavior: SnackBarBehavior.floating, // Consistent styling
+              behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
             ),
           );
@@ -118,7 +123,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
   }
 
   Widget _buildAnimatedItem(Widget child, int index) {
-    return PlayAnimationBuilder<double>( // This widget is now correctly recognized
+    return PlayAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),
       duration: Duration(milliseconds: 400 + (index * 100)),
       delay: Duration(milliseconds: 200 + (index * 100)),
@@ -127,7 +132,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, 40 * (1 - value)), // value is correctly double now
+            offset: Offset(0, 40 * (1 - value)),
             child: child,
           ),
         );
@@ -149,7 +154,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: InteractiveParticleBackground( // Using the common InteractiveParticleBackground
+      body: InteractiveParticleBackground(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24.0).copyWith(top: 80, bottom: 40),
@@ -176,7 +181,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 40),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _firstNameController,
                       hintText: 'First Name',
                       icon: Icons.person_outline,
@@ -186,7 +191,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 24),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _lastNameController,
                       hintText: 'Last Name',
                       icon: Icons.person_outline,
@@ -196,7 +201,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 24),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _usernameController,
                       hintText: 'Username',
                       icon: Icons.alternate_email,
@@ -206,7 +211,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 24),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _emailController,
                       hintText: 'Email',
                       icon: Icons.email_outlined,
@@ -217,7 +222,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 24),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _phoneController,
                       hintText: 'Phone Number',
                       icon: Icons.phone_outlined,
@@ -228,7 +233,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 24),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _nationalIdController,
                       hintText: 'National ID',
                       icon: Icons.badge_outlined,
@@ -249,7 +254,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                   ),
                   const SizedBox(height: 24),
                   _buildAnimatedItem(
-                    GlowingTextField( // Using the common GlowingTextField
+                    GlowingTextField(
                       controller: _passwordController,
                       hintText: 'Password',
                       icon: Icons.lock_outline,
@@ -266,7 +271,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                        : PulsingActionButton( // Using the common PulsingActionButton
+                        : PulsingActionButton(
                       label: 'CREATE ACCOUNT',
                       onTap: _register,
                     ),
@@ -282,7 +287,6 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
   }
 }
 
-// --- Custom Gender Selector (remains here as it's specific) ---
 class GenderSelector extends StatelessWidget {
   final String? selectedValue;
   final Function(String) onChanged;

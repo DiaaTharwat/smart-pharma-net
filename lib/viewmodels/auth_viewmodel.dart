@@ -1,9 +1,12 @@
+// lib/viewmodels/auth_viewmodel.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/repositories/auth_repository.dart';
 import 'package:smart_pharma_net/viewmodels/base_viewmodel.dart';
 import 'package:smart_pharma_net/services/api_service.dart';
+import 'package:smart_pharma_net/models/user_model.dart'; // <<<--- تم إضافة هذا السطر
 
 class AuthViewModel extends BaseViewModel {
   final AuthRepository _authRepository;
@@ -17,12 +20,22 @@ class AuthViewModel extends BaseViewModel {
   String? _impersonatedPharmacyId;
   String? _impersonatedPharmacyName;
 
+  // ========== بداية الإضافة ==========
+  String? _ownerEmail;
+  UserModel? _currentUser; // لتخزين بيانات المستخدم الحالي
+  // ========== نهاية الإضافة ==========
+
   AuthViewModel(this._authRepository, this._apiService);
 
   bool get isAdmin => _isAdmin;
   bool get isPharmacy => _isPharmacy;
   bool get isImpersonating => _isImpersonating;
   bool get canActAsPharmacy => _isPharmacy || _isImpersonating;
+
+  // ========== بداية الإضافة ==========
+  String? get ownerEmail => _ownerEmail;
+  UserModel? get currentUser => _currentUser; // Getter للوصول لبيانات المستخدم
+  // ========== نهاية الإضافة ==========
 
   String? get activePharmacyId {
     if (_isImpersonating) return _impersonatedPharmacyId;
@@ -70,6 +83,12 @@ class AuthViewModel extends BaseViewModel {
         _loggedInPharmacyName = null;
         _impersonatedPharmacyId = null;
         _impersonatedPharmacyName = null;
+        _ownerEmail = email;
+
+        // ========== بداية التعديل ==========
+        await fetchUserProfile(); // جلب بيانات المستخدم بعد تسجيل الدخول
+        // ========== نهاية التعديل ==========
+
         notifyListeners();
         return true;
       }
@@ -82,7 +101,6 @@ class AuthViewModel extends BaseViewModel {
     }
   }
 
-  // ========== Fix Start: Changed return type to String? ==========
   Future<String?> pharmacyLogin({
     required String name,
     required String password,
@@ -121,20 +139,23 @@ class AuthViewModel extends BaseViewModel {
         _impersonatedPharmacyId = null;
         _impersonatedPharmacyName = null;
 
+        // ========== بداية التعديل ==========
+        await fetchUserProfile(); // جلب بيانات المستخدم بعد تسجيل الدخول
+        // ========== نهاية التعديل ==========
+
         notifyListeners();
-        return null; // Return null on success
+        return null;
       } else {
         throw Exception('Login failed: Invalid response');
       }
     } catch (e) {
       final errorMessage = e.toString().replaceAll('Exception: ', '');
       setError(errorMessage);
-      return errorMessage; // Return error message on failure
+      return errorMessage;
     } finally {
       setLoading(false);
     }
   }
-  // ========== Fix End ==========
 
   Future<void> logout() async {
     await _authRepository.logout();
@@ -145,6 +166,12 @@ class AuthViewModel extends BaseViewModel {
     _impersonatedPharmacyName = null;
     _loggedInPharmacyId = null;
     _loggedInPharmacyName = null;
+    _ownerEmail = null;
+
+    // ========== بداية التعديل ==========
+    _currentUser = null; // مسح بيانات المستخدم عند الخروج
+    // ========== نهاية التعديل ==========
+
     notifyListeners();
   }
 
@@ -244,6 +271,9 @@ class AuthViewModel extends BaseViewModel {
         _isAdmin = false;
         _isPharmacy = false;
       }
+      if(_currentUser == null) {
+        await fetchUserProfile();
+      }
     } else {
       await logout();
     }
@@ -262,4 +292,87 @@ class AuthViewModel extends BaseViewModel {
   Future<String?> getUserRole() async {
     return _apiService.userRole;
   }
+
+  // =========================================================================
+  // ================= START: USER SETTINGS VIEWMODEL METHODS ================
+  // =========================================================================
+
+  Future<void> fetchUserProfile() async {
+    setLoading(true);
+    try {
+      final userData = await _authRepository.getUserProfile();
+      _currentUser = UserModel.fromJson(userData);
+      notifyListeners();
+    } catch (e) {
+      setError(e.toString());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> updateProfile({required String firstName, required String lastName}) async {
+    setLoading(true);
+    setError(null);
+    try {
+      final updatedUser = await _authRepository.updateUserProfile(firstName: firstName, lastName: lastName);
+      _currentUser = UserModel.fromJson(updatedUser);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      setError(e.toString());
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> changePassword({required String currentPassword, required String newPassword}) async {
+    setLoading(true);
+    setError(null);
+    try {
+      await _authRepository.changePassword(currentPassword: currentPassword, newPassword: newPassword);
+      return true;
+    } catch (e) {
+      setError(e.toString());
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> changeEmail({required String currentPassword, required String newEmail}) async {
+    setLoading(true);
+    setError(null);
+    try {
+      await _authRepository.changeEmail(currentPassword: currentPassword, newEmail: newEmail);
+      // بعد تغيير الإيميل بنجاح، يفضل تحديث بيانات المستخدم لجلب الإيميل الجديد
+      await fetchUserProfile();
+      return true;
+    } catch (e) {
+      setError(e.toString());
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  Future<bool> deleteAccount() async {
+    setLoading(true);
+    setError(null);
+    try {
+      await _authRepository.deleteAccount();
+      // بعد الحذف يجب تسجيل الخروج
+      await logout();
+      return true;
+    } catch (e) {
+      setError(e.toString());
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+// =========================================================================
+// ================== END: USER SETTINGS VIEWMODEL METHODS =================
+// =========================================================================
 }

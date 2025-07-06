@@ -1,7 +1,7 @@
 // lib/repositories/auth_repository.dart
 // ignore_for_file: unnecessary_null_comparison
 
-import 'package:smart_pharma_net/services/api_service.dart'; //
+import 'package:smart_pharma_net/services/api_service.dart';
 
 class AuthRepository {
   final ApiService _apiService;
@@ -30,9 +30,6 @@ class AuthRepository {
     }
   }
 
-  // -- تعديل نهائي --
-  // تم تغيير `Map<String, String>? additionalData` إلى متغيرات صريحة
-  // `String? pharmacyId` و `String? pharmacyName` لإصلاح خطأ التحويل
   Future<void> saveTokens(
       String accessToken,
       String refreshToken, {
@@ -42,9 +39,6 @@ class AuthRepository {
       }) async {
     try {
       print('Saving tokens in repository - Role: $role');
-
-      // -- تعديل --
-      // الاستدعاء الآن يستخدم المتغيرات الجديدة مباشرة
       await _apiService.saveTokens(
         accessToken,
         refreshToken,
@@ -52,7 +46,6 @@ class AuthRepository {
         pharmacyId: pharmacyId,
         pharmacyName: pharmacyName,
       );
-
       print('Tokens saved successfully');
     } catch (e) {
       print('Error saving tokens in repository: $e');
@@ -171,4 +164,69 @@ class AuthRepository {
       throw Exception('Session expired. Please login again.');
     }
   }
+
+  // =========================================================================
+  // =================== START: USER SETTINGS REPOSITORY METHODS =============
+  // =========================================================================
+
+  Future<Map<String, dynamic>> getUserProfile() async {
+    try {
+      return await _apiService.getUserProfile();
+    } catch (e) {
+      print('Error in AuthRepository getUserProfile: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> updateUserProfile({required String firstName, required String lastName}) async {
+    try {
+      final data = {
+        'first_name': firstName,
+        'last_name': lastName,
+      };
+      return await _apiService.updateUserProfile(data);
+    } catch (e) {
+      print('Error in AuthRepository updateUserProfile: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      final data = {
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      };
+      await _apiService.changePassword(data);
+    } catch (e) {
+      print('Error in AuthRepository changePassword: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> changeEmail({required String currentPassword, required String newEmail}) async {
+    try {
+      final data = {
+        'current_password': currentPassword,
+        'new_email': newEmail,
+      };
+      await _apiService.changeEmail(data);
+    } catch (e) {
+      print('Error in AuthRepository changeEmail: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _apiService.deleteAccount();
+    } catch (e) {
+      print('Error in AuthRepository deleteAccount: $e');
+      rethrow;
+    }
+  }
+
+// =========================================================================
+// =================== END: USER SETTINGS REPOSITORY METHODS ===============
+// =========================================================================
 }

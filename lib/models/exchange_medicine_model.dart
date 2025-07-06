@@ -9,6 +9,8 @@ class ExchangeMedicineModel {
   final String pharmacyLatitude;
   final String pharmacyLongitude;
   final String pharmacyId;
+  final String medicineExpiryDate; // تم إضافته
+  final String? imageUrl; // تم إضافته
 
   ExchangeMedicineModel({
     required this.id,
@@ -19,6 +21,8 @@ class ExchangeMedicineModel {
     required this.pharmacyLatitude,
     required this.pharmacyLongitude,
     required this.pharmacyId,
+    required this.medicineExpiryDate,
+    this.imageUrl,
   });
 
   factory ExchangeMedicineModel.fromJson(Map<String, dynamic> json) {
@@ -31,11 +35,12 @@ class ExchangeMedicineModel {
       pharmacyLatitude: json['pharmacy_latitude']?.toString() ?? '0.0',
       pharmacyLongitude: json['pharmacy_longitude']?.toString() ?? '0.0',
       pharmacyId: json['pharmacy_id']?.toString() ?? '',
+      // ملاحظة: تأكد من أن الـ API يرسل هذه الحقول بنفس الأسماء
+      medicineExpiryDate: json['medicine_expiry_date'] ?? 'N/A',
+      imageUrl: json['image_url'],
     );
   }
 
-  // --- الدالة المفقودة التي تسببت في الخطأ ---
-  // هذه الدالة تسمح بنسخ الكائن مع تعديل بعض خصائصه
   ExchangeMedicineModel copyWith({
     String? id,
     String? medicineName,
@@ -45,6 +50,8 @@ class ExchangeMedicineModel {
     String? pharmacyLatitude,
     String? pharmacyLongitude,
     String? pharmacyId,
+    String? medicineExpiryDate,
+    String? imageUrl,
   }) {
     return ExchangeMedicineModel(
       id: id ?? this.id,
@@ -56,6 +63,8 @@ class ExchangeMedicineModel {
       pharmacyLatitude: pharmacyLatitude ?? this.pharmacyLatitude,
       pharmacyLongitude: pharmacyLongitude ?? this.pharmacyLongitude,
       pharmacyId: pharmacyId ?? this.pharmacyId,
+      medicineExpiryDate: medicineExpiryDate ?? this.medicineExpiryDate,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

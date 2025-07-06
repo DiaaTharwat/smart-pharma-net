@@ -1,9 +1,11 @@
+// lib/view/Screens/menu_bar_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/view/Screens/available_pharmacy_screen.dart';
-import 'package:smart_pharma_net/view/Screens/admin_login_screen.dart';
 import 'package:smart_pharma_net/view/Screens/exchange_screen.dart';
+import 'package:smart_pharma_net/view/Screens/settings_screen.dart';
 import 'package:smart_pharma_net/view/Screens/welcome_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
@@ -197,6 +199,34 @@ class _MenuBarScreenState extends State<MenuBarScreen>
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
 
+    // ========== START OF MODIFICATION: Logic for Welcome Text ==========
+    String welcomeText;
+    String accountTypeText;
+
+    if (authViewModel.isImpersonating) {
+      // Admin impersonating a pharmacy
+      welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
+      accountTypeText = 'Owner (Impersonating)';
+    } else if (authViewModel.isAdmin) {
+      // Admin in their own account
+      final email = authViewModel.ownerEmail;
+      if (email != null && email.isNotEmpty) {
+        welcomeText = 'Welcome, ${email[0].toUpperCase()}';
+      } else {
+        welcomeText = 'Welcome, Owner';
+      }
+      accountTypeText = 'Owner Account';
+    } else if (authViewModel.isPharmacy) {
+      // Pharmacy logged in
+      welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
+      accountTypeText = 'Pharmacy Account';
+    } else {
+      // Fallback for any other user type, e.g., "Normal User"
+      welcomeText = 'Welcome, User';
+      accountTypeText = 'User Account';
+    }
+    // ========== END OF MODIFICATION ==========
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, toolbarHeight: 0),
@@ -216,6 +246,16 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                           onPressed: (){ Navigator.of(context).pop(); },
                         ),
                         const Spacer(),
+
+                        if(authViewModel.isAdmin)
+                          IconButton(
+                            icon: const Icon(Icons.settings, color: Colors.white, size: 28),
+                            onPressed: () {
+                              _navigateTo(context, const SettingsScreen());
+                            },
+                            tooltip: 'Settings',
+                          ),
+
                         if (authViewModel.canActAsPharmacy)
                           const NotificationIcon(),
                       ],
@@ -240,9 +280,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  authViewModel.isPharmacy
-                                      ? authViewModel.activePharmacyName ?? 'Pharmacy'
-                                      : (authViewModel.isImpersonating ? authViewModel.activePharmacyName ?? 'Pharmacy Mode' : 'Welcome, Owner'),
+                                  welcomeText, // Using the new variable here
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 22,
@@ -251,9 +289,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  authViewModel.isImpersonating
-                                      ? 'Owner (Impersonating)'
-                                      : (authViewModel.isAdmin ? 'Owner Account' : 'Pharmacy Account'),
+                                  accountTypeText, // Using the new variable here
                                   style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
                                 ),
                               ],
@@ -267,7 +303,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
               ),
             ),
 
-            // ========== Fix Start: Restructured Menu Logic ==========
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -284,7 +319,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                   ),
 
                   if (authViewModel.isAdmin) ...[
-                    // --- خيارات الـ Owner ---
                     _buildPharmacySelector(context),
                     _buildMenuItem(
                       icon: Icons.store_mall_directory,
@@ -292,7 +326,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       onTap: () => _navigateTo(context, const AvailablePharmaciesScreen()),
                     ),
                     Divider(color: Colors.white.withOpacity(0.2), height: 20),
-                    // أزرار تظهر دائمًا ولكنها تكون معطلة
                     _buildMenuItem(
                       icon: Icons.swap_horiz,
                       title: 'Exchange',
@@ -309,7 +342,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                           ? () => _navigateTo(context, const PricingScreen())
                           : _showSelectPharmacyDialog,
                     ),
-                    // يظهر فقط عند تقمص دور صيدلية
                     if (authViewModel.isImpersonating)
                       _buildMenuItem(
                         icon: Icons.shopping_cart,
@@ -317,7 +349,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                         onTap: () => _navigateTo(context, const PharmacyOrdersScreen()),
                       ),
                   ] else if (authViewModel.isPharmacy) ...[
-                    // --- خيارات الصيدلية ---
                     _buildMenuItem(
                       icon: Icons.store,
                       title: 'My Pharmacy Details',
@@ -350,7 +381,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                 ],
               ),
             ),
-            // ========== Fix End ==========
           ],
         ),
       ),
