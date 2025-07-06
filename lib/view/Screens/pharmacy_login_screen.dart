@@ -79,7 +79,6 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
     if (widget.pharmacyId != null && widget.pharmacyId!.isNotEmpty) {
       try {
         final pharmacyViewModel = Provider.of<PharmacyViewModel>(context, listen: false);
-        final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
         final pharmacy = await pharmacyViewModel.getPharmacyDetails(widget.pharmacyId!);
         if (mounted) {
           setState(() {
@@ -110,7 +109,6 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
     super.dispose();
   }
 
-  // ========== Fix Start: Handling the String? return type correctly ==========
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -123,7 +121,6 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
 
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
 
-    // The function now returns an error message string on failure, and null on success.
     final String? errorResult = await authViewModel.pharmacyLogin(
       name: _nameController.text.trim(),
       password: _passwordController.text,
@@ -134,7 +131,6 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
         _isLoading = false;
       });
 
-      // If errorResult is null, it means login was successful.
       if (errorResult == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -153,7 +149,6 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
         );
 
       } else {
-        // If there's an error string, this is the failure case.
         setState(() {
           _errorMessage = errorResult;
         });
@@ -168,7 +163,6 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
       }
     }
   }
-  // ========== Fix End ==========
 
   @override
   Widget build(BuildContext context) {
@@ -254,7 +248,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
                           GlowingTextField(
                             controller: _nameController,
                             hintText: 'Pharmacy Name',
-                            icon: Icons.store,
+                            prefixIcon: const Icon(Icons.store, color: Colors.white70),
                             enabled: !_isLoading,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -267,7 +261,7 @@ class _PharmacyLoginScreenState extends State<PharmacyLoginScreen> with SingleTi
                           GlowingTextField(
                             controller: _passwordController,
                             hintText: 'Password',
-                            icon: Icons.lock,
+                            prefixIcon: const Icon(Icons.lock, color: Colors.white70),
                             isPassword: true,
                             enabled: !_isLoading,
                             validator: (value) {

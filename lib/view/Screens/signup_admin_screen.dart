@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:simple_animations/simple_animations.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
-import 'package:smart_pharma_net/view/Screens/welcome_screen.dart'; // <<<--- تم التأكد من وجود هذا السطر
+import 'package:smart_pharma_net/view/Screens/welcome_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 
 
@@ -99,14 +99,11 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
             ),
           );
 
-          // ========== START OF FIX ==========
-          // Redirect to the main WelcomeScreen to allow the new user to log in
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const WelcomeScreen()), // تم التعديل هنا
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
                 (route) => false,
           );
-          // ========== END OF FIX ==========
 
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +181,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _firstNameController,
                       hintText: 'First Name',
-                      icon: Icons.person_outline,
+                      prefixIcon: const Icon(Icons.person_outline, color: Colors.white70),
                       validator: (value) => value!.isEmpty ? 'Please enter first name' : null,
                     ),
                     2,
@@ -194,7 +191,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _lastNameController,
                       hintText: 'Last Name',
-                      icon: Icons.person_outline,
+                      prefixIcon: const Icon(Icons.person_outline, color: Colors.white70),
                       validator: (value) => value!.isEmpty ? 'Please enter last name' : null,
                     ),
                     3,
@@ -204,7 +201,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _usernameController,
                       hintText: 'Username',
-                      icon: Icons.alternate_email,
+                      prefixIcon: const Icon(Icons.alternate_email, color: Colors.white70),
                       validator: (value) => value!.isEmpty ? 'Please enter a username' : null,
                     ),
                     4,
@@ -214,7 +211,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _emailController,
                       hintText: 'Email',
-                      icon: Icons.email_outlined,
+                      prefixIcon: const Icon(Icons.email_outlined, color: Colors.white70),
                       keyboardType: TextInputType.emailAddress,
                       validator: (value) => (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
                     ),
@@ -225,7 +222,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _phoneController,
                       hintText: 'Phone Number',
-                      icon: Icons.phone_outlined,
+                      prefixIcon: const Icon(Icons.phone_outlined, color: Colors.white70),
                       keyboardType: TextInputType.phone,
                       validator: (value) => (value == null || value.isEmpty) ? 'Enter phone number' : null,
                     ),
@@ -236,7 +233,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _nationalIdController,
                       hintText: 'National ID',
-                      icon: Icons.badge_outlined,
+                      prefixIcon: const Icon(Icons.badge_outlined, color: Colors.white70),
                       keyboardType: TextInputType.number,
                       validator: (value) => (value == null || value.isEmpty) ? 'Enter National ID' : null,
                     ),
@@ -257,7 +254,7 @@ class _SignUpAdminScreenState extends State<SignUpAdminScreen> with TickerProvid
                     GlowingTextField(
                       controller: _passwordController,
                       hintText: 'Password',
-                      icon: Icons.lock_outline,
+                      prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
                       isPassword: true,
                       validator: (value) => (value == null || value.length < 8) ? 'Password must be at least 8 characters' : null,
                     ),

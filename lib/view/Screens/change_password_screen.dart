@@ -71,19 +71,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // START OF FIX: Removed obscureText from GlowingTextField
+                  // ========== بداية التعديل: تم تصحيح طريقة استدعاء الأيقونة ==========
                   GlowingTextField(
                     controller: _currentPasswordController,
                     hintText: 'Current Password',
-                    icon: Icons.lock_open_outlined,
-                    isPassword: true, // Assuming your widget might have a boolean for this
+                    prefixIcon: const Icon(Icons.lock_open_outlined, color: Colors.white70), // تم التصحيح هنا
+                    isPassword: true,
                     validator: (value) => value!.isEmpty ? 'Please enter your current password' : null,
                   ),
                   const SizedBox(height: 20),
                   GlowingTextField(
                     controller: _newPasswordController,
                     hintText: 'New Password',
-                    icon: Icons.lock_outline,
+                    prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70), // تم التصحيح هنا
                     isPassword: true,
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Please enter a new password';
@@ -95,14 +95,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   GlowingTextField(
                     controller: _confirmPasswordController,
                     hintText: 'Confirm New Password',
-                    icon: Icons.lock_outline,
+                    prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70), // تم التصحيح هنا
                     isPassword: true,
                     validator: (value) {
                       if (value != _newPasswordController.text) return 'Passwords do not match';
                       return null;
                     },
                   ),
-                  // END OF FIX
+                  // ========== نهاية التعديل ==========
                   const SizedBox(height: 40),
                   authViewModel.isLoading
                       ? const CircularProgressIndicator()

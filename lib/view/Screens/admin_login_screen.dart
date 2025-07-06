@@ -264,22 +264,23 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> with TickerProvider
     }
   }
 
+  // ========== بداية التعديل: تم تصحيح طريقة استدعاء الأيقونة ==========
   Widget _buildFormField({
     required TextEditingController controller,
     required String label,
     required IconData icon,
     bool isPassword = false,
-    TextInputType keyboardType = TextInputType.text, // Changed to non-nullable with default
+    TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
   }) {
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
         position: _slideAnimation,
-        child: GlowingTextField( // Using the common GlowingTextField
+        child: GlowingTextField(
           controller: controller,
-          hintText: label, // Changed label to hintText for GlowingTextField
-          icon: icon,
+          hintText: label,
+          prefixIcon: Icon(icon, color: Colors.white70), // تم التصحيح هنا
           isPassword: isPassword,
           keyboardType: keyboardType,
           validator: validator,
@@ -287,6 +288,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> with TickerProvider
       ),
     );
   }
+  // ========== نهاية التعديل ==========
+
 
   // NEW: Function to show forgot password modal
   void _showForgotPasswordModal() {
@@ -308,10 +311,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> with TickerProvider
                 style: TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 20),
+              // ========== بداية التعديل: تم تصحيح طريقة استدعاء الأيقونة ==========
               GlowingTextField(
                 controller: _forgotPasswordEmailController,
                 hintText: 'Your Email',
-                icon: Icons.email_outlined,
+                prefixIcon: Icon(Icons.email_outlined, color: Colors.white70), // تم التصحيح هنا
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -323,6 +327,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> with TickerProvider
                   return null;
                 },
               ),
+              // ========== نهاية التعديل ==========
             ],
           ),
           actions: [

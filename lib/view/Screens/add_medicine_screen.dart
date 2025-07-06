@@ -227,6 +227,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
     }
   }
 
+  // ========== بداية التعديل: تم تصحيح طريقة استدعاء الأيقونة ==========
   Widget _buildFormField({
     required TextEditingController controller,
     required String hintText,
@@ -246,7 +247,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
           child: GlowingTextField(
             controller: controller,
             hintText: hintText,
-            icon: icon,
+            prefixIcon: Icon(icon, color: Colors.white70), // تم التصحيح هنا
             keyboardType: keyboardType,
             validator: validator,
             onChanged: (value) {},
@@ -258,6 +259,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> with SingleTicker
       ),
     );
   }
+  // ========== نهاية التعديل ==========
+
 
   Widget _buildDropdownField({
     required String label,

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -13,6 +14,9 @@ import 'add_medicine_screen.dart';
 import 'chat_ai_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'user_purchase_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -24,13 +28,18 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
   bool _isSortingByDistance = false;
   bool _isLoadingLocation = false;
+
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  File? _selectedImage;
+  final TextRecognizer _textRecognizer = TextRecognizer();
 
   @override
   void initState() {
@@ -55,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
     _animationController.forward();
+    _initSpeech();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authViewModel = context.read<AuthViewModel>();
@@ -70,10 +80,131 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  void _initSpeech() async {
+    try {
+      _speechEnabled = await _speechToText.initialize(
+        onError: (error) => print('Speech Recognition Error: $error'),
+        onStatus: (status) {
+          if (mounted) {
+            setState(() {
+              _isListening = _speechToText.isListening;
+            });
+          }
+          if (status == 'notListening' || status == 'done') {
+            if (mounted) {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print("Speech initialization failed: $e");
+      setState(() {
+        _speechEnabled = false;
+      });
+    }
+  }
+
+  void _startListening() async {
+    if (!_isListening) {
+      bool available = await _speechToText.initialize();
+      if (available) {
+        if (mounted) {
+          setState(() => _isListening = true);
+        }
+        _speechToText.listen(
+          onResult: (result) {
+            if (result.finalResult) {
+              if (mounted) {
+                _searchController.text = result.recognizedWords;
+                _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+                _triggerSearch(result.recognizedWords);
+              }
+            }
+          },
+          listenFor: const Duration(seconds: 10),
+          pauseFor: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  void _stopListening() async {
+    if (_isListening) {
+      await _speechToText.stop();
+      if (mounted) {
+        setState(() => _isListening = false);
+      }
+    }
+  }
+
+  void _pickImageAndRecognizeText() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+
+      if (imageFile == null) return;
+
+      if (mounted) {
+        setState(() {
+          _selectedImage = File(imageFile.path);
+        });
+      }
+
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+
+      String extractedText = recognizedText.text;
+      if (extractedText.isNotEmpty) {
+        extractedText = extractedText.replaceAll('\n', ' ').trim();
+        _searchController.text = extractedText;
+        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+        _triggerSearch(extractedText);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not recognize any text in the image.")),
+        );
+        if (mounted) {
+          setState(() {
+            _selectedImage = null;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error picking image or recognizing text: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("An error occurred: $e")),
+      );
+    }
+  }
+
+  void _clearImageSearch() {
+    setState(() {
+      _selectedImage = null;
+      _searchController.clear();
+      _triggerSearch('');
+    });
+  }
+
+  void _triggerSearch(String query) {
+    final authViewModel = context.read<AuthViewModel>();
+    context
+        .read<MedicineViewModel>()
+        .searchMedicines(query, pharmacyId: authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
+  }
+
+
   @override
   void dispose() {
     _searchController.dispose();
     _animationController.dispose();
+    _textRecognizer.close();
+    _speechToText.cancel();
     super.dispose();
   }
 
@@ -101,8 +232,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<LatLng?> _getUserLocation() async {
-    // This is a placeholder. You should implement actual location fetching logic here.
-    // For example, using the geolocator package:
     try {
       Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
       return LatLng(position.latitude, position.longitude);
@@ -176,24 +305,17 @@ class _HomeScreenState extends State<HomeScreen>
     final authViewModel = context.watch<AuthViewModel>();
     final pharmacyViewModel = context.watch<PharmacyViewModel>();
 
-    // ========== بداية التعديل: منطق جديد ومحسن لإظهار أزرار التحكم ==========
     bool canManage = false;
 
-    // الحالة الأولى: المستخدم هو مالك (Admin) وليس في وضع انتحال شخصية (impersonating)
-    // في هذه الحالة، يمكنه التحكم في أدوية أي صيدلية تابعة له.
     if (authViewModel.isAdmin && !authViewModel.isImpersonating) {
       final ownedPharmacyIds = pharmacyViewModel.pharmacies.map((p) => p.id).toSet();
       canManage = ownedPharmacyIds.contains(medicine.pharmacyId);
     }
-    // الحالة الثانية: المستخدم يتصرف كصيدلية (إما أنه سجل الدخول كصيدلية، أو كمالك ينتحل شخصية صيدلية)
-    // في هذه الحالة، يمكنه التحكم فقط في أدوية الصيدلية النشطة حاليًا.
     else if (authViewModel.canActAsPharmacy) {
       canManage = medicine.pharmacyId == authViewModel.activePharmacyId;
     }
 
-    // زر الشراء يظهر فقط للمستخدم العادي (ليس مالكًا وليس صيدلية)
     final bool isNormalUser = !authViewModel.isAdmin && !authViewModel.isPharmacy;
-    // ========== نهاية التعديل ==========
 
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
@@ -297,7 +419,6 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
             ),
-
             if (canManage)
               _buildAdminActionButtons(context, medicine)
             else if (isNormalUser)
@@ -552,14 +673,47 @@ class _HomeScreenState extends State<HomeScreen>
                           children: [
                             GlowingTextField(
                               controller: _searchController,
-                              hintText: 'Search medicines...',
-                              icon: Icons.search,
+                              hintText: _isListening ? 'Listening...' : 'Search medicines...',
                               onChanged: (value) {
-                                setState(() { _searchQuery = value; });
-                                context
-                                    .read<MedicineViewModel>()
-                                    .searchMedicines(value, pharmacyId: authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
+                                if (_selectedImage == null) {
+                                  _triggerSearch(value);
+                                }
                               },
+                              prefixIcon: _selectedImage != null
+                                  ? Padding(
+                                padding: const EdgeInsets.all(4.0),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.file(
+                                    _selectedImage!,
+                                    height: 30,
+                                    width: 30,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              )
+                                  : const Icon(Icons.search, color: Color(0xFF636AE8)),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_selectedImage != null)
+                                    IconButton(
+                                      icon: const Icon(Icons.close, color: Colors.white70),
+                                      onPressed: _clearImageSearch,
+                                    ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.mic,
+                                      color: _isListening ? Colors.redAccent : Colors.white70,
+                                    ),
+                                    onPressed: _speechEnabled ? (_isListening ? _stopListening : _startListening) : null,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
+                                    onPressed: _pickImageAndRecognizeText,
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
@@ -603,7 +757,7 @@ class _HomeScreenState extends State<HomeScreen>
                                     if (pharmacyViewModel.pharmacies.isEmpty) {
                                       await pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel);
                                     }
-                                    if (!authViewModel.isPharmacy && (medicineViewModel.medicines.length != medicineViewModel.medicines.length || _searchQuery.isNotEmpty)) {
+                                    if (!authViewModel.isPharmacy && (_searchController.text.isNotEmpty)) {
                                       await medicineViewModel.loadMedicines(forceLoadAll: true);
                                     }
 
@@ -695,13 +849,13 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                             const SizedBox(height: 20),
                             Text(
-                              _searchQuery.isNotEmpty ? 'No medicines match your search' : 'No medicines found',
+                              _searchController.text.isNotEmpty ? 'No medicines match your search' : 'No medicines found',
                               style: TextStyle(
                                 fontSize: 20,
                                 color: Colors.white.withOpacity(0.7),
                               ),
                             ),
-                            if (_searchQuery.isNotEmpty) ...[
+                            if (_searchController.text.isNotEmpty) ...[
                               const SizedBox(height: 10),
                               Text(
                                 'Try a different search term',

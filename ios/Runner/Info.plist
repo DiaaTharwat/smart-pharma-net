@@ -45,5 +45,13 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app requires access to speech recognition to allow you to search for medicines using your voice.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires access to the microphone to enable voice search.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires access to your photo library to allow you to select images for searching medicines.</string>
+
 </dict>
 </plist>

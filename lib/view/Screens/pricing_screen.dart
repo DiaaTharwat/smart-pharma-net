@@ -166,7 +166,7 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                       GlowingTextField(
                         controller: TextEditingController(text: cardNumber),
                         hintText: 'Card Number (XXXX XXXX XXXX XXXX)',
-                        icon: Icons.credit_card,
+                        prefixIcon: const Icon(Icons.credit_card, color: Colors.white70),
                         keyboardType: TextInputType.number,
                         onChanged: (value) { cardNumber = value; },
                       ),
@@ -177,7 +177,7 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                             child: GlowingTextField(
                               controller: TextEditingController(text: expiryDate),
                               hintText: 'Expiry Date (MM/YY)',
-                              icon: Icons.calendar_today,
+                              prefixIcon: const Icon(Icons.calendar_today, color: Colors.white70),
                               keyboardType: TextInputType.datetime,
                               onChanged: (value) { expiryDate = value; },
                             ),
@@ -187,7 +187,7 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                             child: GlowingTextField(
                               controller: TextEditingController(text: cvv),
                               hintText: 'CVV (123)',
-                              icon: Icons.lock,
+                              prefixIcon: const Icon(Icons.lock, color: Colors.white70),
                               keyboardType: TextInputType.number,
                               isPassword: true,
                               onChanged: (value) { cvv = value; },
@@ -199,7 +199,7 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                       GlowingTextField(
                         controller: TextEditingController(text: nameOnCard),
                         hintText: 'Name on Card (John Doe)',
-                        icon: Icons.person,
+                        prefixIcon: const Icon(Icons.person, color: Colors.white70),
                         onChanged: (value) { nameOnCard = value; },
                       ),
                       const SizedBox(height: 24),
@@ -512,9 +512,7 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                         const SizedBox(height: 32),
                         authViewModel.canActAsPharmacy
                             ? Text(
-                          // ========== Fix Start ==========
                           'Managing subscription for: ${authViewModel.activePharmacyName}',
-                          // ========== Fix End ==========
                           textAlign: TextAlign.center,
                           style: const TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold),
                         )

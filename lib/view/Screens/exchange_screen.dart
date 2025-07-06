@@ -1,3 +1,4 @@
+import 'dart:io'; // NEW: Added for File handling
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
@@ -7,7 +8,9 @@ import 'package:smart_pharma_net/viewmodels/exchange_viewmodel.dart';
 import 'package:smart_pharma_net/view/Widgets/notification_icon.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
-
+import 'package:image_picker/image_picker.dart'; // NEW: Added for image picking
+import 'package:speech_to_text/speech_to_text.dart'; // NEW: Added for speech recognition
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; // NEW: Added for text recognition
 
 class ExchangeScreen extends StatefulWidget {
   const ExchangeScreen({Key? key}) : super(key: key);
@@ -25,10 +28,19 @@ class _ExchangeScreenState extends State<ExchangeScreen>
 
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
+  // NEW: State variables for new features
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  File? _selectedImage;
+  final TextRecognizer _textRecognizer = TextRecognizer();
+
+
   @override
   void initState() {
     super.initState();
     _setupAnimations();
+    _initSpeech(); // NEW: Initialize speech recognition
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPharmacyAccessAndLoadMedicines();
     });
@@ -57,6 +69,113 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     _controller.forward();
   }
 
+  // NEW: Initialize speech-to-text
+  void _initSpeech() async {
+    _speechEnabled = await _speechToText.initialize(
+      onError: (error) => print('Speech Recognition Error: $error'),
+      onStatus: (status) {
+        if (mounted) {
+          setState(() {
+            _isListening = _speechToText.isListening;
+          });
+        }
+        if (status == 'notListening' || status == 'done') {
+          if (mounted) {
+            setState(() {
+              _isListening = false;
+            });
+          }
+        }
+      },
+    );
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // NEW: Start listening function
+  void _startListening() async {
+    if (!_isListening) {
+      bool available = await _speechToText.initialize();
+      if (available) {
+        if (mounted) {
+          setState(() => _isListening = true);
+        }
+        _speechToText.listen(
+          onResult: (result) {
+            if (result.finalResult) {
+              if (mounted) {
+                _searchController.text = result.recognizedWords;
+                _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+                _triggerSearch(result.recognizedWords);
+              }
+            }
+          },
+          listenFor: const Duration(seconds: 10),
+          pauseFor: const Duration(seconds: 3),
+        );
+      }
+    }
+  }
+
+  // NEW: Stop listening function
+  void _stopListening() async {
+    if (_isListening) {
+      await _speechToText.stop();
+      if (mounted) {
+        setState(() => _isListening = false);
+      }
+    }
+  }
+
+  // NEW: Pick image and recognize text
+  void _pickImageAndRecognizeText() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (imageFile == null) return;
+
+    if (mounted) {
+      setState(() {
+        _selectedImage = File(imageFile.path);
+      });
+    }
+
+    final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+    final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+
+    String extractedText = recognizedText.text;
+    if (extractedText.isNotEmpty) {
+      extractedText = extractedText.replaceAll('\n', ' ').trim();
+      _searchController.text = extractedText;
+      _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+      _triggerSearch(extractedText);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Could not recognize any text in the image.")),
+      );
+      if (mounted) {
+        setState(() {
+          _selectedImage = null;
+        });
+      }
+    }
+  }
+
+  // NEW: Function to clear image and search
+  void _clearImageSearch() {
+    setState(() {
+      _selectedImage = null;
+      _searchController.clear();
+      _triggerSearch('');
+    });
+  }
+
+  // NEW: Centralized search trigger
+  void _triggerSearch(String query) {
+    context.read<ExchangeViewModel>().setSearchQuery(query);
+  }
+
   Future<void> _checkPharmacyAccessAndLoadMedicines() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (!authViewModel.canActAsPharmacy) {
@@ -69,6 +188,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
   void dispose() {
     _searchController.dispose();
     _controller.dispose();
+    _textRecognizer.close(); // NEW: Dispose text recognizer
+    _speechToText.cancel(); // NEW: Cancel speech recognition
     super.dispose();
   }
 
@@ -207,15 +328,50 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                               opacity: _fadeAnimation,
                               child: SlideTransition(
                                 position: _slideAnimation,
+                                // NEW: Modified search field to include new icons
                                 child: GlowingTextField(
                                   controller: _searchController,
-                                  hintText: 'Search medicines or pharmacies...',
-                                  icon: Icons.search,
+                                  hintText: _isListening ? 'Listening...' : 'Search medicines or pharmacies...',
                                   onChanged: (value) {
-                                    context
-                                        .read<ExchangeViewModel>()
-                                        .setSearchQuery(value);
+                                    if (_selectedImage == null) {
+                                      _triggerSearch(value);
+                                    }
                                   },
+                                  prefixIcon: _selectedImage != null
+                                      ? Padding(
+                                    padding: const EdgeInsets.all(4.0),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        _selectedImage!,
+                                        height: 30,
+                                        width: 30,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  )
+                                      : const Icon(Icons.search, color: Color(0xFF636AE8)),
+                                  suffixIcon: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_selectedImage != null)
+                                        IconButton(
+                                          icon: const Icon(Icons.close, color: Colors.white70),
+                                          onPressed: _clearImageSearch,
+                                        ),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.mic,
+                                          color: _isListening ? Colors.redAccent : Colors.white70,
+                                        ),
+                                        onPressed: _speechEnabled ? (_isListening ? _stopListening : _startListening) : null,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
+                                        onPressed: _pickImageAndRecognizeText,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
@@ -345,7 +501,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     );
   }
 
-  // ========== بداية التعديل: تصميم الكارت الجديد ==========
   Widget _buildExchangeMedicineCard(ExchangeMedicineModel medicine, double cardWidth) {
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
@@ -445,8 +600,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                 ],
               ),
             ),
-
-            // زر التبادل الجديد
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: ElevatedButton.icon(
@@ -454,7 +607,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                 label: const Text('Exchange'),
                 onPressed: () => _showBuyMedicineModal(medicine),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF636AE8), // لون أساسي للتطبيق
+                  backgroundColor: const Color(0xFF636AE8),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -467,8 +620,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
       ),
     );
   }
-  // ========== نهاية التعديل ==========
-
 
   void _showBuyMedicineModal(ExchangeMedicineModel medicine) {
     int quantityToBuy = 1;
@@ -480,7 +631,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24), // تعديل للوحة المفاتيح
+              padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
               decoration: BoxDecoration(
                 color: const Color(0xFF0F0F1A),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),

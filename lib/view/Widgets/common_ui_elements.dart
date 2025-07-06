@@ -1,14 +1,14 @@
 // lib/view/Widgets/common_ui_elements.dart
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:simple_animations/simple_animations.dart';
 
-// Custom Glowing Text Field Widget
+// ========== بداية التعديل: تم تحديث GlowingTextField لقبول ويدجت للأيقونات ==========
 class GlowingTextField extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
-  final IconData icon;
+  final Widget? prefixIcon; // تم التغيير من IconData إلى Widget
+  final Widget? suffixIcon; // تم إضافة SuffixIcon
   final bool isPassword;
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
@@ -18,12 +18,12 @@ class GlowingTextField extends StatefulWidget {
   final bool readOnly;
   final VoidCallback? onTap;
 
-
   const GlowingTextField({
     super.key,
     required this.controller,
     required this.hintText,
-    required this.icon,
+    this.prefixIcon, // قيمة اختيارية الآن
+    this.suffixIcon,
     this.isPassword = false,
     this.validator,
     this.keyboardType = TextInputType.text,
@@ -47,9 +47,11 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
   void initState() {
     super.initState();
     _focusNode.addListener(() {
-      setState(() {
-        _isFocused = _focusNode.hasFocus;
-      });
+      if (mounted) {
+        setState(() {
+          _isFocused = _focusNode.hasFocus;
+        });
+      }
     });
   }
 
@@ -61,8 +63,8 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion( // Added MouseRegion for cursor control
-      cursor: SystemMouseCursors.click, // Set cursor to pointer
+    return MouseRegion(
+      cursor: SystemMouseCursors.text, // تم التغيير ليعكس أنه حقل نصي
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
@@ -93,15 +95,22 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
           decoration: InputDecoration(
             hintText: widget.hintText,
             hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-            errorStyle: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 14),
-            prefixIcon: Padding(
-              padding: const EdgeInsets.only(left: 16, right: 8), // Adjusted prefixIcon padding
-              child: Icon(widget.icon, color: Colors.white70),
-            ),
+            errorStyle: const TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: 14),
+            prefixIcon: widget.prefixIcon != null
+                ? Padding(
+              padding: const EdgeInsets.only(left: 16, right: 8),
+              child: widget.prefixIcon,
+            )
+                : null,
             suffixIcon: widget.isPassword
                 ? IconButton(
               icon: Icon(
-                _isObscured ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                _isObscured
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
                 color: Colors.white70,
               ),
               onPressed: () {
@@ -110,15 +119,18 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
                 });
               },
             )
-                : null,
+                : widget.suffixIcon, // استخدام suffixIcon الجديد هنا
             border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20), // Adjusted content padding
+            contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           ),
         ),
       ),
     );
   }
 }
+// ========== نهاية التعديل ==========
+
 
 // Custom Pulsing Action Button (unchanged from previous version)
 class PulsingActionButton extends StatefulWidget {
@@ -126,7 +138,7 @@ class PulsingActionButton extends StatefulWidget {
   final VoidCallback onTap;
   final Color? buttonColor;
   final Color? shadowBaseColor;
-  final IconData? leadingIcon; // NEW: Add leadingIcon property
+  final IconData? leadingIcon;
 
   const PulsingActionButton({
     super.key,
@@ -134,7 +146,7 @@ class PulsingActionButton extends StatefulWidget {
     required this.onTap,
     this.buttonColor,
     this.shadowBaseColor,
-    this.leadingIcon, // NEW: Initialize leadingIcon
+    this.leadingIcon,
   });
 
   @override

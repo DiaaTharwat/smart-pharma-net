@@ -77,7 +77,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> with SingleTickerProv
         const SnackBar(
           content: Text('Login successful!'),
           backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.fixed, // تم التعديل هنا
+          behavior: SnackBarBehavior.fixed,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
         ),
       );
@@ -95,7 +95,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> with SingleTickerProv
         SnackBar(
           content: Text(_loginErrorMessage!),
           backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.fixed, // تم التعديل هنا
+          behavior: SnackBarBehavior.fixed,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
         ),
       );
@@ -212,7 +212,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> with SingleTickerProv
                       child: GlowingTextField( // Using GlowingTextField
                         controller: _emailController,
                         hintText: 'Email',
-                        icon: Icons.email_outlined,
+                        prefixIcon: const Icon(Icons.email_outlined, color: Colors.white70),
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -237,7 +237,7 @@ class _UserLoginScreenState extends State<UserLoginScreen> with SingleTickerProv
                       child: GlowingTextField( // Using GlowingTextField
                         controller: _passwordController,
                         hintText: 'Password',
-                        icon: Icons.lock_outline,
+                        prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
                         isPassword: true, // Handles obscureText and suffixIcon automatically
                         validator: (value) {
                           if (value == null || value.isEmpty) {

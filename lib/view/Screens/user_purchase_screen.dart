@@ -1,5 +1,3 @@
-// lib/view/Screens/user_purchase_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/medicine_model.dart';
@@ -129,7 +127,7 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                       GlowingTextField(
                         controller: _usernameController,
                         hintText: 'Username',
-                        icon: Icons.person_outline,
+                        prefixIcon: const Icon(Icons.person_outline, color: Colors.white70),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your username';
@@ -144,7 +142,7 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                       GlowingTextField(
                         controller: _emailController,
                         hintText: 'Email',
-                        icon: Icons.email_outlined,
+                        prefixIcon: const Icon(Icons.email_outlined, color: Colors.white70),
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || !RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
@@ -160,7 +158,7 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                       GlowingTextField(
                         controller: _phoneController,
                         hintText: 'Phone Number',
-                        icon: Icons.phone_outlined,
+                        prefixIcon: const Icon(Icons.phone_outlined, color: Colors.white70),
                         keyboardType: TextInputType.phone,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -176,7 +174,7 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                       GlowingTextField(
                         controller: _addressController,
                         hintText: 'Address',
-                        icon: Icons.home_outlined,
+                        prefixIcon: const Icon(Icons.home_outlined, color: Colors.white70),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your address';
