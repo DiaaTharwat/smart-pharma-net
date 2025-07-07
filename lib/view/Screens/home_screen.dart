@@ -80,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  // --- باقي دوال initState and speech recognition كما هي ---
   void _initSpeech() async {
     try {
       _speechEnabled = await _speechToText.initialize(
@@ -192,6 +193,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _triggerSearch(String query) {
+    // --- عند البحث، نتأكد من إلغاء ترتيب المسافة ليعرض نتائج البحث الجديدة أولاً ---
+    if (_isSortingByDistance) {
+      setState(() {
+        _isSortingByDistance = false;
+      });
+    }
     final authViewModel = context.read<AuthViewModel>();
     context
         .read<MedicineViewModel>()
@@ -208,6 +215,7 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
+  // --- باقي دوال الصفحة كما هي ---
   Future<void> _handleLogout(BuildContext context) async {
     final authViewModel = context.read<AuthViewModel>();
     await authViewModel.logout();
@@ -716,73 +724,79 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                             ),
                             const SizedBox(height: 16),
-                            ElevatedButton.icon(
-                              icon: Icon(
-                                _isLoadingLocation
-                                    ? null
-                                    : (_isSortingByDistance ? Icons.filter_list_off_outlined : Icons.location_on_outlined),
-                                color: _isLoadingLocation ? Colors.transparent : Colors.white,
-                                size: 24,
-                              ),
-                              label: _isLoadingLocation
-                                  ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                              )
-                                  : Text(
-                                _isSortingByDistance ? "CLEAR SORT" : "SORT BY DISTANCE",
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF636AE8).withAlpha(_isSortingByDistance ? 200: 255),
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15.0),
-                                    side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1.0)
+                            // --- التعديل الأول: إخفاء زر الترتيب إذا كان المستخدم صيدلية ---
+                            if (!authViewModel.isPharmacy)
+                              ElevatedButton.icon(
+                                icon: Icon(
+                                  _isLoadingLocation
+                                      ? null
+                                      : (_isSortingByDistance ? Icons.filter_list_off_outlined : Icons.location_on_outlined),
+                                  color: _isLoadingLocation ? Colors.transparent : Colors.white,
+                                  size: 24,
                                 ),
-                                elevation: 5,
-                                shadowColor: const Color(0xFF636AE8).withOpacity(0.6),
-                              ),
-                              onPressed: _isLoadingLocation ? null : () async {
-                                final pharmacyViewModel = context.read<PharmacyViewModel>();
-                                final medicineViewModel = context.read<MedicineViewModel>();
-                                setState(() { _isLoadingLocation = true; });
-                                if (_isSortingByDistance) {
-                                  medicineViewModel.clearDistanceSort(pharmacyIdForReset: authViewModel.activePharmacyId);
-                                  setState(() { _isSortingByDistance = false; });
-                                } else {
-                                  LatLng? userLocation = await _getUserLocation();
-                                  if (userLocation != null && mounted) {
-                                    if (pharmacyViewModel.pharmacies.isEmpty) {
-                                      await pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel);
-                                    }
-                                    if (!authViewModel.isPharmacy && (_searchController.text.isNotEmpty)) {
-                                      await medicineViewModel.loadMedicines(forceLoadAll: true);
-                                    }
+                                label: _isLoadingLocation
+                                    ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                                )
+                                    : Text(
+                                  _isSortingByDistance ? "CLEAR SORT" : "SORT BY DISTANCE",
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF636AE8).withAlpha(_isSortingByDistance ? 200: 255),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15.0),
+                                      side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1.0)
+                                  ),
+                                  elevation: 5,
+                                  shadowColor: const Color(0xFF636AE8).withOpacity(0.6),
+                                ),
+                                onPressed: _isLoadingLocation ? null : () async {
+                                  final pharmacyViewModel = context.read<PharmacyViewModel>();
+                                  final medicineViewModel = context.read<MedicineViewModel>();
+                                  setState(() { _isLoadingLocation = true; });
 
-                                    if (mounted && pharmacyViewModel.pharmacies.isNotEmpty) {
-                                      await medicineViewModel.sortMedicinesByDistance(userLocation, pharmacyViewModel.pharmacies);
-                                      setState(() { _isSortingByDistance = true; });
+                                  if (_isSortingByDistance) {
+                                    // --- التعديل الثاني: استدعاء الدالة الجديدة بدون بارامترات ---
+                                    medicineViewModel.clearDistanceSort();
+                                    setState(() { _isSortingByDistance = false; });
+                                  } else {
+                                    LatLng? userLocation = await _getUserLocation();
+                                    if (userLocation != null && mounted) {
+                                      if (pharmacyViewModel.pharmacies.isEmpty) {
+                                        await pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel);
+                                      }
+                                      // --- التعديل الثالث: حذف الكود الذي يعيد تحميل كل الأدوية ---
+                                      // هذا السطر كان يسبب الخطأ رقم 2
+                                      // if (!authViewModel.isPharmacy && (_searchController.text.isNotEmpty)) {
+                                      //   await medicineViewModel.loadMedicines(forceLoadAll: true);
+                                      // }
+
+                                      if (mounted && pharmacyViewModel.pharmacies.isNotEmpty) {
+                                        await medicineViewModel.sortMedicinesByDistance(userLocation, pharmacyViewModel.pharmacies);
+                                        setState(() { _isSortingByDistance = true; });
+                                      } else if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Could not load pharmacies for sorting.'),
+                                              backgroundColor: Colors.red,
+                                              behavior: SnackBarBehavior.fixed,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                                            ));
+                                      }
                                     } else if (mounted) {
                                       ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Could not load pharmacies for sorting.'),
+                                          const SnackBar(content: Text('Could not get location. Please ensure location services and permissions are enabled.'),
                                             backgroundColor: Colors.red,
-                                            behavior: SnackBarBehavior.fixed,
                                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                                           ));
                                     }
-                                  } else if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Could not get location. Please ensure location services and permissions are enabled.'),
-                                          backgroundColor: Colors.red,
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                                        ));
                                   }
-                                }
-                                setState(() { _isLoadingLocation = false; });
-                              },
-                            ),
+                                  setState(() { _isLoadingLocation = false; });
+                                },
+                              ),
                           ],
                         ),
                       ),
@@ -876,6 +890,12 @@ class _HomeScreenState extends State<HomeScreen>
 
                     return RefreshIndicator(
                       onRefresh: () async {
+                        // عند السحب للتحديث، ألغِ الترتيب وأعد تحميل القائمة الأساسية
+                        if (_isSortingByDistance) {
+                          setState(() {
+                            _isSortingByDistance = false;
+                          });
+                        }
                         medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: !authViewModel.isPharmacy);
                       },
                       color: const Color(0xFF636AE8),

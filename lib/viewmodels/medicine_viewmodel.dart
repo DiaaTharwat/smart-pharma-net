@@ -1,4 +1,3 @@
-// lib/viewmodels/medicine_viewmodel.dart
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/medicine_model.dart';
@@ -14,6 +13,9 @@ class MedicineViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String _error = '';
 
+  // --- التعديل الأول: إضافة متغير لحفظ آخر عملية بحث ---
+  String _lastSearchQuery = '';
+
   MedicineViewModel(this._medicineRepository, this._pharmacyRepository);
 
   List<MedicineModel> get medicines => _medicines;
@@ -23,6 +25,8 @@ class MedicineViewModel extends ChangeNotifier {
   Future<void> loadMedicines({String? pharmacyId, bool forceLoadAll = false}) async {
     _isLoading = true;
     _error = '';
+    // --- التعديل الثاني: إعادة تعيين البحث عند تحميل القائمة من جديد ---
+    _lastSearchQuery = '';
     notifyListeners();
 
     try {
@@ -47,17 +51,15 @@ class MedicineViewModel extends ChangeNotifier {
   Future<void> searchMedicines(String query, {String? pharmacyId}) async {
     _isLoading = true;
     _error = '';
+    // --- التعديل الثالث: حفظ نص البحث الحالي ---
+    _lastSearchQuery = query;
     notifyListeners();
     try {
       if (query.isEmpty) {
         _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
       } else {
-        List<MedicineModel> allMedsToSearchFrom;
-        if(pharmacyId != null) {
-          allMedsToSearchFrom = await _medicineRepository.getMedicinesForPharmacy(pharmacyId);
-        } else {
-          allMedsToSearchFrom = await _medicineRepository.getAllMedicines();
-        }
+        // نستخدم القائمة الأصلية كمصدر للبحث دائمًا لضمان عدم البحث فوق بحث قديم
+        List<MedicineModel> allMedsToSearchFrom = List.from(_originalMedicinesList);
 
         final lowerCaseQuery = query.toLowerCase().trim();
         _medicines = allMedsToSearchFrom
@@ -75,13 +77,13 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  // --- تم التعديل هنا ---
+  // --- دوال لم تتغير ---
   Future<bool> addMedicine({
     required String name,
     required String description,
     required double price,
     required int quantity,
-    required String pharmacyId, // هذا المتغير ضروري لتحديد الصيدلية
+    required String pharmacyId,
     required String category,
     required String expiryDate,
     required bool canBeSell,
@@ -106,12 +108,9 @@ class MedicineViewModel extends ChangeNotifier {
         'image_url': (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
       };
 
-      // تم تعديل استدعاء الدالة لتمرير `pharmacyId`
-      // هذا يفترض أن لديك دالة في الـ Repository تقبل `pharmacyId`
-      // إذا كانت الدالة الحالية `addMedicine` لا تقبل `pharmacyId`، يجب تعديلها هناك أيضاً
       await _medicineRepository.addMedicine(
           medicineData: medicineData,
-          pharmacyId: pharmacyId // تمرير `pharmacyId` هنا هو مفتاح الحل
+          pharmacyId: pharmacyId
       );
 
       await loadMedicines(pharmacyId: pharmacyId);
@@ -201,7 +200,7 @@ class MedicineViewModel extends ChangeNotifier {
     try {
       if (allPharmacies.isEmpty) {
         _error = "No pharmacies available to sort by distance.";
-        _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
+        _medicines = List.from(_medicines.map((m) => m.copyWith(distance: null)));
         notifyListeners();
         return;
       }
@@ -211,7 +210,8 @@ class MedicineViewModel extends ChangeNotifier {
       };
 
       final Distance distanceCalculator = Distance();
-      List<MedicineModel> medicinesToSort = List.from(_originalMedicinesList);
+      // --- التعديل الرابع: ترتيب القائمة المعروضة حاليًا وليس القائمة الأصلية الكاملة ---
+      List<MedicineModel> medicinesToSort = List.from(_medicines);
       List<MedicineModel> processedMedicines = [];
 
       for (var med in medicinesToSort) {
@@ -239,7 +239,7 @@ class MedicineViewModel extends ChangeNotifier {
 
     } catch (e) {
       _error = "Error sorting medicines by distance: ${e.toString()}";
-      _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
+      _medicines = List.from(_medicines.map((m) => m.copyWith(distance: null)));
       print(_error);
     } finally {
       _isLoading = false;
@@ -247,12 +247,18 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  void clearDistanceSort({String? pharmacyIdForReset}) {
-    if (_originalMedicinesList.isNotEmpty) {
-      _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
+  // --- التعديل الخامس: تعديل دالة إلغاء الترتيب لتعيد البحث السابق أو القائمة الأصلية ---
+  void clearDistanceSort() {
+    // إذا كان هناك بحث سابق، قم بإعادة البحث للحصول على النتائج غير المرتبة
+    // هذا يضمن أننا نعود إلى نتائج البحث وليس القائمة الكاملة
+    if (_lastSearchQuery.isNotEmpty) {
+      searchMedicines(_lastSearchQuery);
     } else {
-      loadMedicines(pharmacyId: pharmacyIdForReset);
+      // إذا لم يكن هناك بحث، ارجع للقائمة الأصلية الكاملة
+      _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
     }
+    // لا حاجة لـ notifyListeners() هنا لأن searchMedicines تقوم بذلك بالفعل
+    // لكن نضيفها للاحتياط إذا لم يتم الدخول في الشرط الأول
     notifyListeners();
   }
 }
