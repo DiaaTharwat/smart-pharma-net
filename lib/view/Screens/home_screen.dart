@@ -80,7 +80,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  // --- باقي دوال initState and speech recognition كما هي ---
   void _initSpeech() async {
     try {
       _speechEnabled = await _speechToText.initialize(
@@ -96,6 +95,9 @@ class _HomeScreenState extends State<HomeScreen>
               setState(() {
                 _isListening = false;
               });
+              if (_searchController.text.isNotEmpty) {
+                _triggerSearch(_searchController.text);
+              }
             }
           }
         },
@@ -111,36 +113,33 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _startListening() async {
-    if (!_isListening) {
-      bool available = await _speechToText.initialize();
-      if (available) {
-        if (mounted) {
-          setState(() => _isListening = true);
-        }
-        _speechToText.listen(
-          onResult: (result) {
-            if (result.finalResult) {
-              if (mounted) {
-                _searchController.text = result.recognizedWords;
-                _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
-                _triggerSearch(result.recognizedWords);
-              }
-            }
-          },
-          listenFor: const Duration(seconds: 10),
-          pauseFor: const Duration(seconds: 3),
-        );
+  void _startListening() {
+    if (_speechEnabled && !_isListening) {
+      if (mounted) {
+        setState(() => _isListening = true);
       }
+      _speechToText.listen(
+        onResult: (result) {
+          if (mounted) {
+            setState(() {
+              _searchController.text = result.recognizedWords;
+              _searchController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _searchController.text.length),
+              );
+            });
+          }
+        },
+        listenFor: const Duration(seconds: 5),
+        pauseFor: const Duration(seconds: 2),
+      );
+    } else {
+      print('Could not start listening. Speech enabled: $_speechEnabled, Is listening: $_isListening');
     }
   }
 
   void _stopListening() async {
     if (_isListening) {
       await _speechToText.stop();
-      if (mounted) {
-        setState(() => _isListening = false);
-      }
     }
   }
 
@@ -160,9 +159,23 @@ class _HomeScreenState extends State<HomeScreen>
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
 
-      String extractedText = recognizedText.text;
+      // --- التعديل الرئيسي لتحسين البحث بالصورة ---
+      String extractedText = "";
+      if (recognizedText.blocks.isNotEmpty) {
+        // نأخذ أول سطرين فقط، فهما على الأغلب يحتويان على اسم الدواء
+        List<String> lines = recognizedText.blocks.first.text.split('\n');
+        if (lines.length > 2) {
+          extractedText = "${lines[0]} ${lines[1]}";
+        } else {
+          extractedText = lines.join(" ");
+        }
+
+        // نقوم بإزالة الأرقام والوحدات الشائعة لتحسين دقة البحث
+        extractedText = extractedText.replaceAll(RegExp(r'\d+'), '').replaceAll(RegExp(r'(mg|ml|g)'), '').trim();
+      }
+      // -----------------------------------------
+
       if (extractedText.isNotEmpty) {
-        extractedText = extractedText.replaceAll('\n', ' ').trim();
         _searchController.text = extractedText;
         _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
         _triggerSearch(extractedText);
@@ -193,7 +206,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _triggerSearch(String query) {
-    // --- عند البحث، نتأكد من إلغاء ترتيب المسافة ليعرض نتائج البحث الجديدة أولاً ---
     if (_isSortingByDistance) {
       setState(() {
         _isSortingByDistance = false;
@@ -215,7 +227,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  // --- باقي دوال الصفحة كما هي ---
   Future<void> _handleLogout(BuildContext context) async {
     final authViewModel = context.read<AuthViewModel>();
     await authViewModel.logout();
@@ -724,7 +735,6 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                             ),
                             const SizedBox(height: 16),
-                            // --- التعديل الأول: إخفاء زر الترتيب إذا كان المستخدم صيدلية ---
                             if (!authViewModel.isPharmacy)
                               ElevatedButton.icon(
                                 icon: Icon(
@@ -760,7 +770,6 @@ class _HomeScreenState extends State<HomeScreen>
                                   setState(() { _isLoadingLocation = true; });
 
                                   if (_isSortingByDistance) {
-                                    // --- التعديل الثاني: استدعاء الدالة الجديدة بدون بارامترات ---
                                     medicineViewModel.clearDistanceSort();
                                     setState(() { _isSortingByDistance = false; });
                                   } else {
@@ -769,11 +778,6 @@ class _HomeScreenState extends State<HomeScreen>
                                       if (pharmacyViewModel.pharmacies.isEmpty) {
                                         await pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel);
                                       }
-                                      // --- التعديل الثالث: حذف الكود الذي يعيد تحميل كل الأدوية ---
-                                      // هذا السطر كان يسبب الخطأ رقم 2
-                                      // if (!authViewModel.isPharmacy && (_searchController.text.isNotEmpty)) {
-                                      //   await medicineViewModel.loadMedicines(forceLoadAll: true);
-                                      // }
 
                                       if (mounted && pharmacyViewModel.pharmacies.isNotEmpty) {
                                         await medicineViewModel.sortMedicinesByDistance(userLocation, pharmacyViewModel.pharmacies);
@@ -890,7 +894,6 @@ class _HomeScreenState extends State<HomeScreen>
 
                     return RefreshIndicator(
                       onRefresh: () async {
-                        // عند السحب للتحديث، ألغِ الترتيب وأعد تحميل القائمة الأساسية
                         if (_isSortingByDistance) {
                           setState(() {
                             _isSortingByDistance = false;
