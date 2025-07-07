@@ -1,9 +1,10 @@
+// lib/view/screens/pricing_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/viewmodels/subscription_viewmodel.dart';
 import 'package:smart_pharma_net/services/api_service.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
-import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart'; // Import AuthViewModel
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 
 class PricingScreen extends StatefulWidget {
   const PricingScreen({super.key});
@@ -14,7 +15,9 @@ class PricingScreen extends StatefulWidget {
 
 class _PricingScreenState extends State<PricingScreen> with SingleTickerProviderStateMixin {
   bool _isMonthly = true;
-  String? _currentSubscriptionType;
+  // ========== بداية الحذف: لم نعد بحاجة لمتغير حالة محلي ==========
+  // String? _currentSubscriptionType;
+  // ========== نهاية الحذف ==========
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -37,9 +40,11 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
     );
     _controller.forward();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkSubscriptionStatus();
-    });
+    // ========== بداية الحذف: لم نعد بحاجة لهذه الدالة ==========
+    // WidgetsBinding.instance.addPostFrameCallback((_) {
+    //   _checkSubscriptionStatus();
+    // });
+    // ========== نهاية الحذف ==========
   }
 
   @override
@@ -48,15 +53,17 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  Future<void> _checkSubscriptionStatus() async {
-    final apiService = context.read<ApiService>();
-    final subType = await apiService.getSubscriptionType();
-    if (mounted) {
-      setState(() {
-        _currentSubscriptionType = subType;
-      });
-    }
-  }
+  // ========== بداية الحذف: لم نعد بحاجة لهذه الدالة ==========
+  // Future<void> _checkSubscriptionStatus() async {
+  //   final apiService = context.read<ApiService>();
+  //   final subType = await apiService.getSubscriptionType();
+  //   if (mounted) {
+  //     setState(() {
+  //       _currentSubscriptionType = subType;
+  //     });
+  //   }
+  // }
+  // ========== نهاية الحذف ==========
 
   Future<void> _showPaymentModal(String selectedPlanTitle, String selectedPlanType, String price) async {
     String cardNumber = '';
@@ -65,10 +72,15 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
     String nameOnCard = '';
     bool isProcessingPayment = false;
 
-    if (_currentSubscriptionType != null &&
-        _currentSubscriptionType!.isNotEmpty &&
-        _currentSubscriptionType! != 'Free' &&
-        _currentSubscriptionType! != selectedPlanType) {
+    // ========== بداية التعديل: الاعتماد على authViewModel مباشرة ==========
+    final authViewModel = context.read<AuthViewModel>();
+    final currentSubscriptionType = authViewModel.subscriptionType;
+    // ========== نهاية التعديل ==========
+
+    if (currentSubscriptionType != null &&
+        currentSubscriptionType.isNotEmpty &&
+        currentSubscriptionType != 'Free' &&
+        currentSubscriptionType != selectedPlanType) {
       final bool? confirmChange = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -77,7 +89,7 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           title: const Text('Change Subscription?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           content: Text(
-            'You are currently subscribed to the "$_currentSubscriptionType" plan. Subscribing to "$selectedPlanTitle" will replace your current subscription . Do you wish to continue?',
+            'You are currently subscribed to the "$currentSubscriptionType" plan. Subscribing to "$selectedPlanTitle" will replace your current subscription . Do you wish to continue?',
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [
@@ -236,7 +248,9 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
                                 backgroundColor: Colors.green, behavior: SnackBarBehavior.fixed, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
                               ),
                             );
-                            _checkSubscriptionStatus();
+                            // ========== بداية الحذف: لم نعد بحاجة لهذا السطر ==========
+                            // _checkSubscriptionStatus();
+                            // ========== نهاية الحذف ==========
                             Navigator.of(context).pop();
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -289,7 +303,9 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
 
     if (confirmCancel == true) {
       context.read<SubscriptionViewModel>().clearLocalSubscription();
-      _checkSubscriptionStatus();
+      // ========== بداية الحذف: لم نعد بحاجة لهذا السطر ==========
+      // _checkSubscriptionStatus();
+      // ========== نهاية الحذف ==========
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -312,8 +328,10 @@ class _PricingScreenState extends State<PricingScreen> with SingleTickerProvider
     bool isPopular = false,
     required String planType,
   }) {
+    // ========== بداية التعديل: الاعتماد على authViewModel مباشرة ==========
     final authViewModel = context.watch<AuthViewModel>();
-    final bool isCurrentPlanLocally = _currentSubscriptionType == planType;
+    final bool isCurrentPlanLocally = authViewModel.subscriptionType == planType;
+    // ========== نهاية التعديل ==========
     final String price = _isMonthly ? monthlyPrice : yearlyPrice;
     final String billingPeriod = _isMonthly ? '/month' : '/year';
 

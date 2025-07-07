@@ -6,7 +6,7 @@ import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/repositories/auth_repository.dart';
 import 'package:smart_pharma_net/viewmodels/base_viewmodel.dart';
 import 'package:smart_pharma_net/services/api_service.dart';
-import 'package:smart_pharma_net/models/user_model.dart'; // <<<--- تم إضافة هذا السطر
+import 'package:smart_pharma_net/models/user_model.dart';
 
 class AuthViewModel extends BaseViewModel {
   final AuthRepository _authRepository;
@@ -19,10 +19,11 @@ class AuthViewModel extends BaseViewModel {
   bool _isImpersonating = false;
   String? _impersonatedPharmacyId;
   String? _impersonatedPharmacyName;
-
-  // ========== بداية الإضافة ==========
   String? _ownerEmail;
-  UserModel? _currentUser; // لتخزين بيانات المستخدم الحالي
+  UserModel? _currentUser;
+
+  // ========== بداية الإضافة (1/4): إضافة متغير لتخزين حالة الاشتراك ==========
+  String? _subscriptionType;
   // ========== نهاية الإضافة ==========
 
   AuthViewModel(this._authRepository, this._apiService);
@@ -31,11 +32,13 @@ class AuthViewModel extends BaseViewModel {
   bool get isPharmacy => _isPharmacy;
   bool get isImpersonating => _isImpersonating;
   bool get canActAsPharmacy => _isPharmacy || _isImpersonating;
-
-  // ========== بداية الإضافة ==========
   String? get ownerEmail => _ownerEmail;
-  UserModel? get currentUser => _currentUser; // Getter للوصول لبيانات المستخدم
+  UserModel? get currentUser => _currentUser;
+
+  // ========== بداية الإضافة (2/4): Getter للوصول لحالة الاشتراك ==========
+  String? get subscriptionType => _subscriptionType;
   // ========== نهاية الإضافة ==========
+
 
   String? get activePharmacyId {
     if (_isImpersonating) return _impersonatedPharmacyId;
@@ -48,6 +51,13 @@ class AuthViewModel extends BaseViewModel {
     if (_isPharmacy) return _loggedInPharmacyName;
     return null;
   }
+
+  // ========== بداية الإضافة (3/4): دالة لتحديث حالة الاشتراك من خارج الملف ==========
+  void updateSubscriptionStatus(String? newStatus) {
+    _subscriptionType = newStatus;
+    notifyListeners();
+  }
+  // ========== نهاية الإضافة ==========
 
   Future<void> impersonatePharmacy(PharmacyModel pharmacy) async {
     if (!_isAdmin) return;
@@ -85,9 +95,7 @@ class AuthViewModel extends BaseViewModel {
         _impersonatedPharmacyName = null;
         _ownerEmail = email;
 
-        // ========== بداية التعديل ==========
-        await fetchUserProfile(); // جلب بيانات المستخدم بعد تسجيل الدخول
-        // ========== نهاية التعديل ==========
+        await fetchUserProfile();
 
         notifyListeners();
         return true;
@@ -139,8 +147,9 @@ class AuthViewModel extends BaseViewModel {
         _impersonatedPharmacyId = null;
         _impersonatedPharmacyName = null;
 
-        // ========== بداية التعديل ==========
-        await fetchUserProfile(); // جلب بيانات المستخدم بعد تسجيل الدخول
+        // ========== بداية التعديل: تحميل بيانات المستخدم والاشتراك بعد تسجيل الدخول ==========
+        await fetchUserProfile();
+        _subscriptionType = await _apiService.getSubscriptionType(); // تحميل الاشتراك
         // ========== نهاية التعديل ==========
 
         notifyListeners();
@@ -167,10 +176,11 @@ class AuthViewModel extends BaseViewModel {
     _loggedInPharmacyId = null;
     _loggedInPharmacyName = null;
     _ownerEmail = null;
+    _currentUser = null;
 
-    // ========== بداية التعديل ==========
-    _currentUser = null; // مسح بيانات المستخدم عند الخروج
-    // ========== نهاية التعديل ==========
+    // ========== بداية الإضافة (4/4): مسح حالة الاشتراك عند الخروج ==========
+    _subscriptionType = null;
+    // ========== نهاية الإضافة ==========
 
     notifyListeners();
   }
@@ -264,6 +274,11 @@ class AuthViewModel extends BaseViewModel {
         _isImpersonating = false;
         _loggedInPharmacyId = prefs.getString(ApiService.pharmacyIdKey);
         _loggedInPharmacyName = prefs.getString(ApiService.pharmacyNameKey);
+
+        // ========== بداية التعديل: تحميل حالة الاشتراك عند استعادة الجلسة ==========
+        _subscriptionType = await _apiService.getSubscriptionType();
+        // ========== نهاية التعديل ==========
+
       } else if (currentRole == 'admin') {
         _isAdmin = true;
         _isPharmacy = false;
@@ -292,10 +307,6 @@ class AuthViewModel extends BaseViewModel {
   Future<String?> getUserRole() async {
     return _apiService.userRole;
   }
-
-  // =========================================================================
-  // ================= START: USER SETTINGS VIEWMODEL METHODS ================
-  // =========================================================================
 
   Future<void> fetchUserProfile() async {
     setLoading(true);
@@ -345,7 +356,6 @@ class AuthViewModel extends BaseViewModel {
     setError(null);
     try {
       await _authRepository.changeEmail(currentPassword: currentPassword, newEmail: newEmail);
-      // بعد تغيير الإيميل بنجاح، يفضل تحديث بيانات المستخدم لجلب الإيميل الجديد
       await fetchUserProfile();
       return true;
     } catch (e) {
@@ -361,7 +371,6 @@ class AuthViewModel extends BaseViewModel {
     setError(null);
     try {
       await _authRepository.deleteAccount();
-      // بعد الحذف يجب تسجيل الخروج
       await logout();
       return true;
     } catch (e) {
@@ -371,8 +380,4 @@ class AuthViewModel extends BaseViewModel {
       setLoading(false);
     }
   }
-
-// =========================================================================
-// ================== END: USER SETTINGS VIEWMODEL METHODS =================
-// =========================================================================
 }

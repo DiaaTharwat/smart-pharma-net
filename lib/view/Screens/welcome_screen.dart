@@ -1,18 +1,18 @@
-import 'dart:math' as math; // The necessary import
+// lib/view/screens/welcome_screen.dart
 
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:simple_animations/simple_animations.dart';
 import 'package:smart_pharma_net/view/Screens/admin_login_screen.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
-import 'package:smart_pharma_net/view/Screens/pharmacy_login_screen.dart'; // <<< تم إضافة هذا السطر
+import 'package:smart_pharma_net/view/Screens/pharmacy_login_screen.dart';
 import 'package:smart_pharma_net/view/Screens/signup_admin_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'package:smart_pharma_net/view/Widgets/app_logo.dart';
 
 
-// --- Welcome Screen Widget ---
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
 
@@ -31,6 +31,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
+
+    // ========== بداية الإضافة: التحقق من حالة تسجيل الدخول عند بدء التشغيل ==========
+    // هذا الكود سيقوم بالتحقق مما إذا كان المستخدم مسجلاً للدخول بالفعل
+    // وسيقوم بتحميل بياناته وحالة الاشتراك تلقائياً.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AuthViewModel>(context, listen: false).isLoggedIn().then((loggedIn) {
+        if (loggedIn && mounted) {
+          // إذا كان المستخدم مسجلاً دخوله بالفعل، يمكنك نقله مباشرة إلى الشاشة الرئيسية
+          // عن طريق إزالة التعليق من السطر التالي.
+          // Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => const HomeScreen()));
+        }
+      });
+    });
+    // ========== نهاية الإضافة ==========
+
     _controller = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
@@ -76,8 +91,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   }
 
   void _showLoginOptions(BuildContext context) {
-    final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -86,9 +99,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: const Color(0xFF0F0F1A), // Darker shade from new design
+            color: const Color(0xFF0F0F1A),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-            border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)), // Border
+            border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -107,15 +120,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white, // White text
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(height: 24),
               PulsingActionButton(
                 label: 'Admin',
                 leadingIcon: Icons.admin_panel_settings,
-                buttonColor: const Color(0xFF636AE8), // Revert to default purple
-                shadowBaseColor: const Color(0xFF636AE8), // Revert to default purple shadow
+                buttonColor: const Color(0xFF636AE8),
+                shadowBaseColor: const Color(0xFF636AE8),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -127,11 +140,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 },
               ),
               const SizedBox(height: 16),
-              // =========================  بداية التعديل =========================
               PulsingActionButton(
                 label: 'Pharmacy',
                 leadingIcon: Icons.local_pharmacy,
-                buttonColor: const Color(0xFF00A86B), // A shade of teal/green
+                buttonColor: const Color(0xFF00A86B),
                 shadowBaseColor: const Color(0xFF00A86B),
                 onTap: () {
                   Navigator.pop(context);
@@ -144,12 +156,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                 },
               ),
               const SizedBox(height: 16),
-              // =========================  نهاية التعديل =========================
               PulsingActionButton(
                 label: 'User',
                 leadingIcon: Icons.person,
-                buttonColor: Colors.green, // NEW: Change button color to green
-                shadowBaseColor: Colors.green, // NEW: Change shadow base color to green
+                buttonColor: Colors.green,
+                shadowBaseColor: Colors.green,
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.pushReplacement(
@@ -172,7 +183,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: InteractiveParticleBackground( // Using the common InteractiveParticleBackground
+      body: InteractiveParticleBackground(
         child: SafeArea(
           child: Stack(
             children: [
@@ -182,7 +193,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Spacer(),
-                    // App Logo with animation
                     ScaleTransition(
                       scale: _scaleAnimation,
                       child: FadeTransition(
@@ -191,7 +201,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 24),
-                    // Welcome Text with animation
                     FadeTransition(
                       opacity: _fadeAnimation,
                       child: SlideTransition(
@@ -219,7 +228,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                           'Smart PharmaNet',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 36, // Larger font
+                            fontSize: 36,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                             shadows: [
@@ -235,7 +244,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       child: SlideTransition(
                         position: _slideAnimation,
                         child: Text(
-                          'The Future of Pharmacy Management.', // Text content
+                          'The Future of Pharmacy Management.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 18,
@@ -245,7 +254,6 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
                       ),
                     ),
                     const Spacer(),
-                    // Buttons with slide animation
                     SlideTransition(
                       position: _slideAnimation,
                       child: Column(
@@ -285,13 +293,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> with TickerProviderStateM
   }
 }
 
-// --- The pulsing logo in the center ---
 class SynapseLogo extends StatelessWidget {
   const SynapseLogo({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Using LoopAnimation from simple_animations
     return LoopAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.9, end: 1.0),
       duration: const Duration(seconds: 2),
@@ -307,9 +313,7 @@ class SynapseLogo extends StatelessWidget {
               color: const Color(0xFF636AE8).withOpacity(0.2),
               boxShadow: [
                 BoxShadow(
-                  // =================== تم التصحيح هنا ===================
                   color: const Color(0xFF636AE8).withOpacity(math.max(0, value - 0.7)),
-                  // ===================================================
                   blurRadius: 30,
                   spreadRadius: 10,
                 ),

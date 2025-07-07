@@ -14,11 +14,9 @@ class SubscriptionViewModel extends ChangeNotifier {
 
   SubscriptionViewModel(this._subscriptionRepository, this._apiService, this._authViewModel);
 
-  // Getters
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  // Setters
   set isLoading(bool value) {
     _isLoading = value;
     notifyListeners();
@@ -46,6 +44,10 @@ class SubscriptionViewModel extends ChangeNotifier {
 
       await _apiService.saveSubscriptionType(type);
 
+      // ========== بداية الإضافة: تحديث حالة الاشتراك في AuthViewModel ==========
+      _authViewModel.updateSubscriptionStatus(type);
+      // ========== نهاية الإضافة ==========
+
       isLoading = false;
       return true;
     } catch (e) {
@@ -61,6 +63,9 @@ class SubscriptionViewModel extends ChangeNotifier {
 
   void clearLocalSubscription() {
     _apiService.saveSubscriptionType('Free');
+    // ========== بداية الإضافة: تحديث حالة الاشتراك في AuthViewModel عند الإلغاء ==========
+    _authViewModel.updateSubscriptionStatus('Free');
+    // ========== نهاية الإضافة ==========
     notifyListeners();
   }
 }
