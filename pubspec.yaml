@@ -49,6 +49,8 @@ dev_dependencies:
   simple_animations: ^5.0.2
   flutter_svg: ^2.0.10+1
   lints: ^6.0.0
+  string_similarity: ^2.0.0 # <--- أضف هذا السطر
+
 
 
 flutter_launcher_icons:

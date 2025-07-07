@@ -1,4 +1,3 @@
-// lib/viewmodels/exchange_viewmodel.dart
 import 'package:flutter/material.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/repositories/exchange_repository.dart';
@@ -20,6 +19,10 @@ class ExchangeViewModel extends BaseViewModel {
   ExchangeViewModel(this._exchangeRepository, this._authViewModel);
 
   List<ExchangeMedicineModel> get exchangeMedicines => _exchangeMedicines;
+
+  // --- ✅ التعديل هنا: تم إضافة السطر الجديد ---
+  List<String> get allExchangeMedicineNames => _originalExchangeMedicines.map((med) => med.medicineName).toList();
+  // -----------------------------------------
 
   Future<void> loadExchangeMedicines() async {
     setLoading(true);

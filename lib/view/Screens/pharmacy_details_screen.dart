@@ -1,6 +1,10 @@
-// lib/view/Screens/pharmacy_details_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:string_similarity/string_similarity.dart';
 import '../../models/pharmacy_model.dart';
 import '../../viewmodels/pharmacy_viewmodel.dart';
 import 'add_medicine_screen.dart';
@@ -22,6 +26,16 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  final TextEditingController _searchController = TextEditingController();
+  List<MedicineModel> _originalMedicines = [];
+  List<MedicineModel> _filteredMedicines = [];
+
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  File? _selectedImage;
+  final TextRecognizer _textRecognizer = TextRecognizer();
+
   @override
   void initState() {
     super.initState();
@@ -42,13 +56,149 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<PharmacyViewModel>().loadMedicinesForPharmacy(widget.pharmacy.id);
+      _initSpeech();
     });
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _searchController.dispose();
+    _textRecognizer.close();
+    _speechToText.cancel();
     super.dispose();
+  }
+
+  void _initSpeech() async {
+    try {
+      _speechEnabled = await _speechToText.initialize(
+        onError: (error) => print('Speech Recognition Error: $error'),
+        onStatus: (status) {
+          if (mounted) {
+            setState(() {
+              _isListening = _speechToText.isListening;
+            });
+            if (status == 'notListening' || status == 'done') {
+              if (mounted) {
+                setState(() => _isListening = false);
+              }
+            }
+          }
+        },
+      );
+      if (mounted) setState(() {});
+    } catch (e) {
+      print("Speech initialization failed: $e");
+      if (mounted) setState(() => _speechEnabled = false);
+    }
+  }
+
+  void _startListening() {
+    if (_speechEnabled && !_isListening) {
+      if (mounted) setState(() => _isListening = true);
+      _speechToText.listen(
+        onResult: (result) {
+          if (mounted) {
+            setState(() {
+              _searchController.text = result.recognizedWords;
+              _searchController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _searchController.text.length),
+              );
+              _triggerSearch(result.recognizedWords);
+            });
+          }
+        },
+        listenFor: const Duration(seconds: 10),
+        pauseFor: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  void _stopListening() async {
+    if (_isListening) {
+      await _speechToText.stop();
+      if (mounted) {
+        setState(() => _isListening = false);
+      }
+    }
+  }
+
+  // --- ✅ التصحيح النهائي لدالة البحث بالصورة ---
+  void _pickImageAndRecognizeText() async {
+    if (_originalMedicines.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Medicines are not loaded yet.")),
+      );
+      return;
+    }
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+      if (imageFile == null) return;
+      if (mounted) setState(() => _selectedImage = File(imageFile.path));
+
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+      final String fullTextFromImage = recognizedText.text;
+
+      if (fullTextFromImage.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not recognize any text.")),
+        );
+        _clearImageSearch();
+        return;
+      }
+
+      // --- هذا هو المنطق الصحيح ---
+      final List<String> medicineNames = _originalMedicines.map((m) => m.name).toList();
+      final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
+
+      if (bestMatch.bestMatch.rating != null && bestMatch.bestMatch.rating! > 0.2) {
+        final String foundMedicineName = bestMatch.bestMatch.target!;
+        _searchController.text = foundMedicineName;
+        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+        _triggerSearch(foundMedicineName);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not find a matching medicine.")),
+        );
+        _clearImageSearch();
+      }
+      // --------------------------
+
+    } catch (e) {
+      print("Error picking image or recognizing text: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("An error occurred: $e")),
+      );
+      _clearImageSearch();
+    }
+  }
+
+  void _clearImageSearch() {
+    setState(() {
+      _selectedImage = null;
+      _searchController.clear();
+      _triggerSearch('');
+    });
+  }
+
+  void _triggerSearch(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredMedicines = List.from(_originalMedicines);
+      });
+    } else {
+      final lowerCaseQuery = query.toLowerCase().trim();
+      setState(() {
+        _filteredMedicines = _originalMedicines
+            .where((medicine) =>
+        medicine.name.toLowerCase().contains(lowerCaseQuery) ||
+            medicine.category.toLowerCase().contains(lowerCaseQuery))
+            .toList();
+      });
+    }
   }
 
   Future<void> _showDeleteConfirmation(BuildContext context) async {
@@ -149,7 +299,6 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
     );
   }
 
-  // ==================== FINAL LIST CARD DESIGN (REFINED v2) ====================
   Widget _buildMedicineCard(MedicineModel medicine) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -168,7 +317,7 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min, // Make column shrink to fit content
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -261,7 +410,6 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
       ),
     );
   }
-  // ====================================================================
 
   @override
   Widget build(BuildContext context) {
@@ -354,8 +502,61 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
                 ),
               ),
               const SizedBox(height: 20),
+              GlowingTextField(
+                controller: _searchController,
+                hintText: _isListening ? 'Listening...' : 'Search medicines in this pharmacy...',
+                onChanged: (value) {
+                  if (_selectedImage == null) {
+                    _triggerSearch(value);
+                  }
+                },
+                prefixIcon: _selectedImage != null
+                    ? Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      _selectedImage!,
+                      height: 30,
+                      width: 30,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+                    : const Icon(Icons.search, color: Color(0xFF636AE8)),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_selectedImage != null)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        onPressed: _clearImageSearch,
+                      ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.mic,
+                        color: _isListening ? Colors.redAccent : Colors.white70,
+                      ),
+                      onPressed: _speechEnabled ? (_isListening ? _stopListening : _startListening) : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
+                      onPressed: _pickImageAndRecognizeText,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               Consumer<PharmacyViewModel>(
                 builder: (context, viewModel, child) {
+                  if (viewModel.pharmacyMedicines.isNotEmpty && _originalMedicines.isEmpty) {
+                    _originalMedicines = List.from(viewModel.pharmacyMedicines);
+                    _filteredMedicines = List.from(viewModel.pharmacyMedicines);
+                  } else if (viewModel.pharmacyMedicines.length != _originalMedicines.length) {
+                    _originalMedicines = List.from(viewModel.pharmacyMedicines);
+                    _triggerSearch(_searchController.text);
+                  }
+
                   if (viewModel.isLoading) {
                     return const Center(
                       child: CircularProgressIndicator(
@@ -375,31 +576,36 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
                       ),
                     );
                   }
-                  if (viewModel.pharmacyMedicines.isEmpty) {
+                  if (_filteredMedicines.isEmpty) {
                     return Center(
-                      child: Column(
-                        children: [
-                          Icon(
-                            Icons.medication_outlined,
-                            size: 80,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'No medicines available for this pharmacy.',
-                            style: TextStyle(fontSize: 20, color: Colors.white.withOpacity(0.7)),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 30.0),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 80,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(height: 20),
+                            Text(
+                              _searchController.text.isNotEmpty
+                                  ? 'No medicines match your search.'
+                                  : 'No medicines available for this pharmacy.',
+                              style: TextStyle(fontSize: 20, color: Colors.white.withOpacity(0.7)),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: viewModel.pharmacyMedicines.length,
+                    itemCount: _filteredMedicines.length,
                     itemBuilder: (context, index) {
-                      final medicine = viewModel.pharmacyMedicines[index];
+                      final medicine = _filteredMedicines[index];
                       return _buildMedicineCard(medicine);
                     },
                   );

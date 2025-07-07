@@ -1,6 +1,6 @@
-import 'dart:io'; // NEW: Added for File handling
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // NEW: Added for image picking
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
@@ -12,8 +12,9 @@ import 'package:smart_pharma_net/view/Screens/add_pharmacy_screen.dart';
 import 'package:smart_pharma_net/view/Screens/pharmacy_details_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'package:smart_pharma_net/view/Screens/medicine_screen.dart';
-import 'package:speech_to_text/speech_to_text.dart'; // NEW: Added for speech recognition
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; // NEW: Added for text recognition from image
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:string_similarity/string_similarity.dart';
 
 class AvailablePharmaciesScreen extends StatefulWidget {
   const AvailablePharmaciesScreen({super.key});
@@ -30,7 +31,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // NEW: State variables for new features
   final SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
@@ -66,105 +66,133 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDataBasedOnRole();
-      _initSpeech(); // NEW: Initialize speech recognition
+      _initSpeech();
     });
   }
 
-  // NEW: Initialize speech-to-text
   void _initSpeech() async {
-    _speechEnabled = await _speechToText.initialize(
-      onError: (error) => print('Speech Recognition Error: $error'),
-      onStatus: (status) {
-        if (mounted) {
-          setState(() {
-            _isListening = _speechToText.isListening;
-          });
-        }
-        if (status == 'notListening' || status == 'done') {
+    try {
+      _speechEnabled = await _speechToText.initialize(
+        onError: (error) => print('Speech Recognition Error: $error'),
+        onStatus: (status) {
           if (mounted) {
             setState(() {
-              _isListening = false;
+              _isListening = _speechToText.isListening;
             });
           }
-        }
-      },
-    );
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  // NEW: Start listening function
-  void _startListening() async {
-    if (!_isListening) {
-      bool available = await _speechToText.initialize();
-      if (available) {
-        if (mounted) {
-          setState(() => _isListening = true);
-        }
-        _speechToText.listen(
-          onResult: (result) {
-            if (result.finalResult) {
-              if (mounted) {
-                _searchController.text = result.recognizedWords;
-                _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
-                _triggerSearch(result.recognizedWords);
-              }
+          if (status == 'notListening' || status == 'done') {
+            if (mounted) {
+              setState(() {
+                _isListening = false;
+              });
             }
-          },
-          listenFor: const Duration(seconds: 10),
-          pauseFor: const Duration(seconds: 3),
-        );
+          }
+        },
+      );
+      if (mounted) {
+        setState(() {});
       }
+    } catch (e) {
+      print("Speech initialization failed: $e");
+      setState(() {
+        _speechEnabled = false;
+      });
     }
   }
 
+  // --- ✅ التصحيح النهائي لدالة البحث الصوتي ---
+  void _startListening() {
+    if (_speechEnabled && !_isListening) {
+      if (mounted) {
+        setState(() => _isListening = true);
+      }
+      _speechToText.listen(
+        onResult: (result) {
+          if (mounted) {
+            setState(() {
+              _searchController.text = result.recognizedWords;
+              _searchController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _searchController.text.length),
+              );
+              // استدعاء الفلترة الفورية مع كل تغيير
+              _triggerSearch(result.recognizedWords);
+            });
+          }
+        },
+        listenFor: const Duration(seconds: 10), // مدة الاستماع الإجمالية
+        pauseFor: const Duration(seconds: 3),  // مدة الصمت قبل الإيقاف التلقائي
+      );
+    }
+  }
 
-  // NEW: Stop listening function
   void _stopListening() async {
     if (_isListening) {
       await _speechToText.stop();
-      if (mounted) {
+      if(mounted) {
         setState(() => _isListening = false);
       }
     }
   }
 
-  // NEW: Pick image and recognize text
   void _pickImageAndRecognizeText() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+    final pharmacyViewModel = context.read<PharmacyViewModel>();
 
-    if (imageFile == null) return;
-
-    if (mounted) {
-      setState(() {
-        _selectedImage = File(imageFile.path);
-      });
+    if (pharmacyViewModel.allPharmacyNames.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Pharmacy list is not loaded yet. Please try again.")),
+      );
+      return;
     }
 
-    final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
-    final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
 
-    String extractedText = recognizedText.text;
-    if (extractedText.isNotEmpty) {
-      extractedText = extractedText.replaceAll('\n', ' ').trim();
-      _searchController.text = extractedText;
-      _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
-      _triggerSearch(extractedText);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Could not recognize any text in the image.")),
-      );
+      if (imageFile == null) return;
+
       if (mounted) {
         setState(() {
-          _selectedImage = null;
+          _selectedImage = File(imageFile.path);
         });
       }
+
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+
+      final String fullTextFromImage = recognizedText.text;
+
+      if (fullTextFromImage.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not recognize any text in the image.")),
+        );
+        _clearImageSearch();
+        return;
+      }
+
+      final List<String> pharmacyNames = pharmacyViewModel.allPharmacyNames;
+      final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, pharmacyNames);
+
+      if (bestMatch.bestMatch.rating != null && bestMatch.bestMatch.rating! > 0.2) {
+        final String foundPharmacyName = bestMatch.bestMatch.target!;
+        _searchController.text = foundPharmacyName;
+        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+        _triggerSearch(foundPharmacyName);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not find a matching pharmacy.")),
+        );
+        _clearImageSearch();
+      }
+
+    } catch (e) {
+      print("Error picking image or recognizing text: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("An error occurred: $e")),
+      );
+      _clearImageSearch();
     }
   }
 
-  // NEW: Function to clear image and search
   void _clearImageSearch() {
     setState(() {
       _selectedImage = null;
@@ -173,7 +201,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
     });
   }
 
-  // NEW: Centralized search trigger
   void _triggerSearch(String query) {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     final pharmacyViewModel = Provider.of<PharmacyViewModel>(context, listen: false);
@@ -191,8 +218,8 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
   void dispose() {
     _searchController.dispose();
     _controller.dispose();
-    _textRecognizer.close(); // NEW: Dispose text recognizer
-    _speechToText.cancel(); // NEW: Cancel speech recognition
+    _textRecognizer.close();
+    _speechToText.cancel();
     super.dispose();
   }
 
@@ -469,7 +496,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                           IconButton(
                             icon: const Icon(Icons.menu, color: Colors.white, size: 28),
                             onPressed: () {
-                              // Corrected navigation to MenuBarScreen
                               Navigator.push(context, MaterialPageRoute(builder: (context) => const MenuBarScreen()));
                             },
                           ),
@@ -497,7 +523,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                           opacity: _fadeAnimation,
                           child: SlideTransition(
                             position: _slideAnimation,
-                            // NEW: Modified search field to include new icons
                             child: GlowingTextField(
                               controller: _searchController,
                               hintText: _isListening ? 'Listening...' : 'Search pharmacies...',

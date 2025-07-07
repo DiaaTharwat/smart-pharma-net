@@ -62,9 +62,6 @@ class MedicineModel {
     );
   }
 
-  // --- تم التعديل هنا ---
-  // تم حذف الحقول الـ readOnly مثل `id` و `pharmacy` من هنا
-  // لضمان عدم إرسالها للسيرفر بالخطأ في أي مكان مستقبلاً
   Map<String, dynamic> toJson() {
     return {
       'name': name,

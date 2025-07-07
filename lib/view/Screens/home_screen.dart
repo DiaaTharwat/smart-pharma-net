@@ -17,6 +17,7 @@ import 'user_purchase_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:string_similarity/string_similarity.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -143,7 +144,18 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  // --- ✅ الخطوة 2: تعديل دالة البحث بالصورة بالكامل ---
   void _pickImageAndRecognizeText() async {
+    final medicineViewModel = context.read<MedicineViewModel>();
+
+    // التأكد من وجود أدوية للمقارنة بها
+    if (medicineViewModel.allMedicineNames.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Medicine list is not loaded yet. Please try again in a moment.")),
+      );
+      return;
+    }
+
     try {
       final ImagePicker picker = ImagePicker();
       final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
@@ -159,43 +171,45 @@ class _HomeScreenState extends State<HomeScreen>
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
       final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
 
-      // --- التعديل الرئيسي لتحسين البحث بالصورة ---
-      String extractedText = "";
-      if (recognizedText.blocks.isNotEmpty) {
-        // نأخذ أول سطرين فقط، فهما على الأغلب يحتويان على اسم الدواء
-        List<String> lines = recognizedText.blocks.first.text.split('\n');
-        if (lines.length > 2) {
-          extractedText = "${lines[0]} ${lines[1]}";
-        } else {
-          extractedText = lines.join(" ");
-        }
+      final String fullTextFromImage = recognizedText.text;
 
-        // نقوم بإزالة الأرقام والوحدات الشائعة لتحسين دقة البحث
-        extractedText = extractedText.replaceAll(RegExp(r'\d+'), '').replaceAll(RegExp(r'(mg|ml|g)'), '').trim();
-      }
-      // -----------------------------------------
-
-      if (extractedText.isNotEmpty) {
-        _searchController.text = extractedText;
-        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
-        _triggerSearch(extractedText);
-      } else {
+      if (fullTextFromImage.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Could not recognize any text in the image.")),
         );
-        if (mounted) {
-          setState(() {
-            _selectedImage = null;
-          });
-        }
+        _clearImageSearch(); // مسح الصورة إذا لم يتم العثور على نص
+        return;
       }
+
+      // جلب قائمة أسماء الأدوية من الـ ViewModel
+      final List<String> medicineNames = medicineViewModel.allMedicineNames;
+
+      // استخدام المكتبة الجديدة لإيجاد أفضل تطابق
+      final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
+
+      // نتحقق من أن أفضل تطابق له تقييم جيد (مثلاً فوق 0.4) لتجنب النتائج الخاطئة
+      if (bestMatch.bestMatch.rating != null && bestMatch.bestMatch.rating! > 0.3) {
+        final String foundMedicineName = bestMatch.bestMatch.target!;
+        _searchController.text = foundMedicineName;
+        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+        _triggerSearch(foundMedicineName);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not find a matching medicine.")),
+        );
+        // يمكنك اختيار مسح حقل البحث أو تركه كما هو
+        _clearImageSearch();
+      }
+
     } catch (e) {
       print("Error picking image or recognizing text: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("An error occurred: $e")),
       );
+      _clearImageSearch();
     }
   }
+  // -------------------------------------------------------------
 
   void _clearImageSearch() {
     setState(() {

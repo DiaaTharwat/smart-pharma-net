@@ -20,6 +20,10 @@ class PharmacyViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String get error => _error;
 
+  // --- ✅ التعديل هنا: تم إضافة السطر الجديد ---
+  List<String> get allPharmacyNames => _pharmacies.map((p) => p.name).toList();
+  // -----------------------------------------
+
   Future<void> addPharmacy({
     required String name,
     required String city,

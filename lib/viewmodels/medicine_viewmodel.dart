@@ -13,7 +13,6 @@ class MedicineViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String _error = '';
 
-  // --- التعديل الأول: إضافة متغير لحفظ آخر عملية بحث ---
   String _lastSearchQuery = '';
 
   MedicineViewModel(this._medicineRepository, this._pharmacyRepository);
@@ -22,10 +21,13 @@ class MedicineViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String get error => _error;
 
+  // --- ✅ التعديل: Getter جديد لجلب قائمة أسماء الأدوية للمقارنة ---
+  List<String> get allMedicineNames => _originalMedicinesList.map((med) => med.name).toList();
+  // ----------------------------------------------------------------
+
   Future<void> loadMedicines({String? pharmacyId, bool forceLoadAll = false}) async {
     _isLoading = true;
     _error = '';
-    // --- التعديل الثاني: إعادة تعيين البحث عند تحميل القائمة من جديد ---
     _lastSearchQuery = '';
     notifyListeners();
 
@@ -51,14 +53,12 @@ class MedicineViewModel extends ChangeNotifier {
   Future<void> searchMedicines(String query, {String? pharmacyId}) async {
     _isLoading = true;
     _error = '';
-    // --- التعديل الثالث: حفظ نص البحث الحالي ---
     _lastSearchQuery = query;
     notifyListeners();
     try {
       if (query.isEmpty) {
         _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
       } else {
-        // نستخدم القائمة الأصلية كمصدر للبحث دائمًا لضمان عدم البحث فوق بحث قديم
         List<MedicineModel> allMedsToSearchFrom = List.from(_originalMedicinesList);
 
         final lowerCaseQuery = query.toLowerCase().trim();
@@ -77,7 +77,6 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  // --- دوال لم تتغير ---
   Future<bool> addMedicine({
     required String name,
     required String description,
@@ -210,7 +209,6 @@ class MedicineViewModel extends ChangeNotifier {
       };
 
       final Distance distanceCalculator = Distance();
-      // --- التعديل الرابع: ترتيب القائمة المعروضة حاليًا وليس القائمة الأصلية الكاملة ---
       List<MedicineModel> medicinesToSort = List.from(_medicines);
       List<MedicineModel> processedMedicines = [];
 
@@ -247,18 +245,12 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  // --- التعديل الخامس: تعديل دالة إلغاء الترتيب لتعيد البحث السابق أو القائمة الأصلية ---
   void clearDistanceSort() {
-    // إذا كان هناك بحث سابق، قم بإعادة البحث للحصول على النتائج غير المرتبة
-    // هذا يضمن أننا نعود إلى نتائج البحث وليس القائمة الكاملة
     if (_lastSearchQuery.isNotEmpty) {
       searchMedicines(_lastSearchQuery);
     } else {
-      // إذا لم يكن هناك بحث، ارجع للقائمة الأصلية الكاملة
       _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
     }
-    // لا حاجة لـ notifyListeners() هنا لأن searchMedicines تقوم بذلك بالفعل
-    // لكن نضيفها للاحتياط إذا لم يتم الدخول في الشرط الأول
     notifyListeners();
   }
 }
