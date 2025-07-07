@@ -14,7 +14,7 @@ import 'package:smart_pharma_net/view/Screens/pricing_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/notification_icon.dart';
-
+import 'package:smart_pharma_net/viewmodels/order_viewmodel.dart'; // -- ADDED --
 
 class MenuBarScreen extends StatefulWidget {
   const MenuBarScreen({super.key});
@@ -182,13 +182,22 @@ class _MenuBarScreenState extends State<MenuBarScreen>
               );
             }).toList(),
           ],
+          // -- MODIFIED --: The logic to fetch notifications is added here.
           onChanged: (String? newValue) {
+            // Get the OrderViewModel instance to call its methods.
+            final orderVm = context.read<OrderViewModel>();
+
             if (newValue == 'owner_mode') {
               authVm.stopImpersonation();
             } else if (newValue != null) {
               final selectedPharmacy = pharmacyVm.pharmacies.firstWhere((p) => p.id == newValue, orElse: () => pharmacyVm.pharmacies.first);
               authVm.impersonatePharmacy(selectedPharmacy);
             }
+
+            // -- ADDED --: Trigger notification and order loading immediately after
+            // the authentication state has changed.
+            orderVm.loadImportantNotifications();
+            orderVm.loadIncomingOrders();
           },
         ),
       ),
@@ -199,16 +208,13 @@ class _MenuBarScreenState extends State<MenuBarScreen>
   Widget build(BuildContext context) {
     final authViewModel = context.watch<AuthViewModel>();
 
-    // ========== START OF MODIFICATION: Logic for Welcome Text ==========
     String welcomeText;
     String accountTypeText;
 
     if (authViewModel.isImpersonating) {
-      // Admin impersonating a pharmacy
       welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
-      accountTypeText = 'Owner (Impersonating)';
+      accountTypeText = 'Owner';
     } else if (authViewModel.isAdmin) {
-      // Admin in their own account
       final email = authViewModel.ownerEmail;
       if (email != null && email.isNotEmpty) {
         welcomeText = 'Welcome, ${email[0].toUpperCase()}';
@@ -217,15 +223,12 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       }
       accountTypeText = 'Owner Account';
     } else if (authViewModel.isPharmacy) {
-      // Pharmacy logged in
       welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
       accountTypeText = 'Pharmacy Account';
     } else {
-      // Fallback for any other user type, e.g., "Normal User"
       welcomeText = 'Welcome, User';
       accountTypeText = 'User Account';
     }
-    // ========== END OF MODIFICATION ==========
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -280,7 +283,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  welcomeText, // Using the new variable here
+                                  welcomeText,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 22,
@@ -289,7 +292,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  accountTypeText, // Using the new variable here
+                                  accountTypeText,
                                   style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
                                 ),
                               ],

@@ -9,8 +9,8 @@ class ExchangeMedicineModel {
   final String pharmacyLatitude;
   final String pharmacyLongitude;
   final String pharmacyId;
-  final String medicineExpiryDate; // تم إضافته
-  final String? imageUrl; // تم إضافته
+  final String medicineExpiryDate;
+  final String? imageUrl;
 
   ExchangeMedicineModel({
     required this.id,
@@ -30,14 +30,15 @@ class ExchangeMedicineModel {
       id: json['id']?.toString() ?? '',
       medicineName: json['medicine_name'] ?? 'Unknown Medicine',
       medicinePriceToSell: json['medicine_price_to_sell']?.toString() ?? '0.0',
-      medicineQuantityToSell: json['medicine_quantity_to_sell']?.toString() ?? '0',
+      medicineQuantityToSell:
+      json['medicine_quantity_to_sell']?.toString() ?? '0',
       pharmacyName: json['pharmacy_name'] ?? 'Unknown Pharmacy',
       pharmacyLatitude: json['pharmacy_latitude']?.toString() ?? '0.0',
       pharmacyLongitude: json['pharmacy_longitude']?.toString() ?? '0.0',
       pharmacyId: json['pharmacy_id']?.toString() ?? '',
-      // ملاحظة: تأكد من أن الـ API يرسل هذه الحقول بنفس الأسماء
-      medicineExpiryDate: json['medicine_expiry_date'] ?? 'N/A',
-      imageUrl: json['image_url'],
+      imageUrl: json['medicine_image'] ?? json['image_url'],
+      // -- MODIFIED --: The key for the expiry date has been corrected from 'medicine_expiry_date' to 'exp_date'.
+      medicineExpiryDate: json['exp_date'] ?? 'N/A',
     );
   }
 

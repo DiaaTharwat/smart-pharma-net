@@ -1,3 +1,5 @@
+// lib/view/exchange/exchange_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -12,6 +14,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:string_similarity/string_similarity.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 class ExchangeScreen extends StatefulWidget {
   const ExchangeScreen({Key? key}) : super(key: key);
@@ -27,14 +31,14 @@ class _ExchangeScreenState extends State<ExchangeScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+  GlobalKey<ScaffoldMessengerState>();
 
   final SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
   File? _selectedImage;
   final TextRecognizer _textRecognizer = TextRecognizer();
-
 
   @override
   void initState() {
@@ -93,7 +97,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     }
   }
 
-  // --- ✅ التصحيح النهائي لدالة البحث الصوتي ---
   void _startListening() {
     if (_speechEnabled && !_isListening) {
       if (mounted) setState(() => _isListening = true);
@@ -105,7 +108,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
               _searchController.selection = TextSelection.fromPosition(
                 TextPosition(offset: _searchController.text.length),
               );
-              // استدعاء الفلترة مع كل تغيير في النص المسموع
               _triggerSearch(result.recognizedWords);
             });
           }
@@ -115,7 +117,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
       );
     }
   }
-  // ------------------------------------------
 
   void _stopListening() async {
     if (_isListening) {
@@ -131,19 +132,23 @@ class _ExchangeScreenState extends State<ExchangeScreen>
 
     if (exchangeViewModel.allExchangeMedicineNames.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Exchange list is not loaded yet. Please try again.")),
+        const SnackBar(
+            content:
+            Text("Exchange list is not loaded yet. Please try again.")),
       );
       return;
     }
 
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+      final XFile? imageFile =
+      await picker.pickImage(source: ImageSource.gallery);
       if (imageFile == null) return;
       if (mounted) setState(() => _selectedImage = File(imageFile.path));
 
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+      final RecognizedText recognizedText =
+      await _textRecognizer.processImage(inputImage);
       final String fullTextFromImage = recognizedText.text;
 
       if (fullTextFromImage.trim().isEmpty) {
@@ -154,13 +159,17 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         return;
       }
 
-      final List<String> medicineNames = exchangeViewModel.allExchangeMedicineNames;
-      final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
+      final List<String> medicineNames =
+          exchangeViewModel.allExchangeMedicineNames;
+      final BestMatch bestMatch =
+      StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
 
-      if (bestMatch.bestMatch.rating != null && bestMatch.bestMatch.rating! > 0.2) {
+      if (bestMatch.bestMatch.rating != null &&
+          bestMatch.bestMatch.rating! > 0.2) {
         final String foundMedicineName = bestMatch.bestMatch.target!;
         _searchController.text = foundMedicineName;
-        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+        _searchController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _searchController.text.length));
         _triggerSearch(foundMedicineName);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -168,7 +177,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         );
         _clearImageSearch();
       }
-
     } catch (e) {
       print("Error picking image or recognizing text: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -221,7 +229,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
             content: Text('Logged out from pharmacy session.'),
             backgroundColor: Color(0xFF636AE8),
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(10))),
           ),
         );
         Navigator.pushAndRemoveUntil(
@@ -239,7 +248,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
             content: Text('Failed to logout from pharmacy: ${e.toString()}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(10))),
           ),
         );
       }
@@ -293,16 +303,19 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 28),
+                                  icon: const Icon(Icons.arrow_back_ios_new,
+                                      color: Colors.white, size: 28),
                                   onPressed: _handleBackNavigation,
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                                  icon: const Icon(Icons.menu,
+                                      color: Colors.white, size: 28),
                                   onPressed: () {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => const MenuBarScreen(),
+                                        builder: (context) =>
+                                        const MenuBarScreen(),
                                       ),
                                     );
                                   },
@@ -316,22 +329,29 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                       fontSize: 26,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
-                                      shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
+                                      shadows: [
+                                        Shadow(
+                                            blurRadius: 10.0,
+                                            color: Color(0xFF636AE8))
+                                      ],
                                     ),
                                     textAlign: TextAlign.center,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
+                                  icon: const Icon(Icons.refresh,
+                                      color: Colors.white, size: 28),
                                   onPressed: () => context
                                       .read<ExchangeViewModel>()
                                       .loadExchangeMedicines(),
                                 ),
                                 const NotificationIcon(),
-                                if (authViewModel.isAdmin && authViewModel.isPharmacy)
+                                if (authViewModel.isAdmin &&
+                                    authViewModel.isPharmacy)
                                   IconButton(
-                                    icon: const Icon(Icons.exit_to_app, color: Colors.white, size: 28),
+                                    icon: const Icon(Icons.exit_to_app,
+                                        color: Colors.white, size: 28),
                                     tooltip: 'Logout from Pharmacy',
                                     onPressed: _logoutFromPharmacy,
                                   ),
@@ -344,7 +364,9 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                 position: _slideAnimation,
                                 child: GlowingTextField(
                                   controller: _searchController,
-                                  hintText: _isListening ? 'Listening...' : 'Search medicines or pharmacies...',
+                                  hintText: _isListening
+                                      ? 'Listening...'
+                                      : 'Search medicines or pharmacies...',
                                   onChanged: (value) {
                                     if (_selectedImage == null) {
                                       _triggerSearch(value);
@@ -354,7 +376,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                       ? Padding(
                                     padding: const EdgeInsets.all(4.0),
                                     child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius:
+                                      BorderRadius.circular(8),
                                       child: Image.file(
                                         _selectedImage!,
                                         height: 30,
@@ -363,24 +386,34 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                       ),
                                     ),
                                   )
-                                      : const Icon(Icons.search, color: Color(0xFF636AE8)),
+                                      : const Icon(Icons.search,
+                                      color: Color(0xFF636AE8)),
                                   suffixIcon: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       if (_selectedImage != null)
                                         IconButton(
-                                          icon: const Icon(Icons.close, color: Colors.white70),
+                                          icon: const Icon(Icons.close,
+                                              color: Colors.white70),
                                           onPressed: _clearImageSearch,
                                         ),
                                       IconButton(
                                         icon: Icon(
                                           Icons.mic,
-                                          color: _isListening ? Colors.redAccent : Colors.white70,
+                                          color: _isListening
+                                              ? Colors.redAccent
+                                              : Colors.white70,
                                         ),
-                                        onPressed: _speechEnabled ? (_isListening ? _stopListening : _startListening) : null,
+                                        onPressed: _speechEnabled
+                                            ? (_isListening
+                                            ? _stopListening
+                                            : _startListening)
+                                            : null,
                                       ),
                                       IconButton(
-                                        icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
+                                        icon: const Icon(
+                                            Icons.camera_alt_outlined,
+                                            color: Colors.white70),
                                         onPressed: _pickImageAndRecognizeText,
                                       ),
                                     ],
@@ -398,8 +431,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                           if (exchangeViewModel.isLoading) {
                             return const Center(
                               child: CircularProgressIndicator(
-                                valueColor:
-                                AlwaysStoppedAnimation<Color>(Color(0xFF636AE8)),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color(0xFF636AE8)),
                               ),
                             );
                           }
@@ -418,14 +451,16 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                     const SizedBox(height: 20),
                                     Text(
                                       'Error: ${exchangeViewModel.errorMessage}',
-                                      style:
-                                      TextStyle(color: Colors.red.shade200, fontSize: 17),
+                                      style: TextStyle(
+                                          color: Colors.red.shade200,
+                                          fontSize: 17),
                                       textAlign: TextAlign.center,
                                     ),
                                     const SizedBox(height: 20),
                                     PulsingActionButton(
                                       label: 'Retry',
-                                      onTap: () => exchangeViewModel.loadExchangeMedicines(),
+                                      onTap: () => exchangeViewModel
+                                          .loadExchangeMedicines(),
                                     ),
                                   ],
                                 ),
@@ -433,7 +468,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             );
                           }
 
-                          final displayedMedicines = exchangeViewModel.exchangeMedicines;
+                          final displayedMedicines =
+                              exchangeViewModel.exchangeMedicines;
 
                           if (displayedMedicines.isEmpty) {
                             return Center(
@@ -470,7 +506,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                   const SizedBox(height: 20),
                                   PulsingActionButton(
                                     label: 'Refresh List',
-                                    onTap: () => exchangeViewModel.loadExchangeMedicines(),
+                                    onTap: () => exchangeViewModel
+                                        .loadExchangeMedicines(),
                                   ),
                                 ],
                               ),
@@ -482,7 +519,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                           final verticalSpacing = 20.0;
 
                           return RefreshIndicator(
-                            onRefresh: () => exchangeViewModel.loadExchangeMedicines(),
+                            onRefresh: () =>
+                                exchangeViewModel.loadExchangeMedicines(),
                             color: const Color(0xFF636AE8),
                             backgroundColor: Colors.white.withOpacity(0.8),
                             child: SingleChildScrollView(
@@ -492,11 +530,27 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                 runSpacing: verticalSpacing,
                                 alignment: WrapAlignment.start,
                                 children: displayedMedicines.map((medicine) {
-                                  final double screenWidth = MediaQuery.of(context).size.width;
-                                  final double totalHorizontalPadding = screenPadding.left + screenPadding.right;
-                                  final double totalSpacing = horizontalSpacing * 2;
-                                  final double cardWidth = (screenWidth > 1200) ? (screenWidth - totalHorizontalPadding - totalSpacing) / 3 : (screenWidth > 800) ? (screenWidth - totalHorizontalPadding - horizontalSpacing) / 2 : (screenWidth - totalHorizontalPadding);
-                                  return _buildExchangeMedicineCard(medicine, cardWidth);
+                                  final double screenWidth =
+                                      MediaQuery.of(context).size.width;
+                                  final double totalHorizontalPadding =
+                                      screenPadding.left + screenPadding.right;
+                                  final double totalSpacing =
+                                      horizontalSpacing * 2;
+                                  final double cardWidth = (screenWidth >
+                                      1200)
+                                      ? (screenWidth -
+                                      totalHorizontalPadding -
+                                      totalSpacing) /
+                                      3
+                                      : (screenWidth > 800)
+                                      ? (screenWidth -
+                                      totalHorizontalPadding -
+                                      horizontalSpacing) /
+                                      2
+                                      : (screenWidth -
+                                      totalHorizontalPadding);
+                                  return _buildExchangeMedicineCard(
+                                      medicine, cardWidth);
                                 }).toList(),
                               ),
                             ),
@@ -514,9 +568,78 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     );
   }
 
-  Widget _buildExchangeMedicineCard(ExchangeMedicineModel medicine, double cardWidth) {
+  void _showMapDialog(
+      String pharmacyName, String lat, String lon) {
+    final double? latitude = double.tryParse(lat);
+    final double? longitude = double.tryParse(lon);
+
+    if (latitude == null || longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Invalid location data for this pharmacy.")),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: const Color(0xFF636AE8).withOpacity(0.5)),
+        ),
+        title: Text(
+          pharmacyName,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: LatLng(latitude, longitude),
+              initialZoom: 15.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.smart_pharma_net',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    width: 80.0,
+                    height: 80.0,
+                    point: LatLng(latitude, longitude),
+                    child: const Icon(
+                      Icons.location_pin,
+                      color: Colors.redAccent,
+                      size: 40.0,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Close', style: TextStyle(color: Color(0xFF636AE8))),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExchangeMedicineCard(
+      ExchangeMedicineModel medicine, double cardWidth) {
     Widget imageWidget;
-    if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
+    if (medicine.imageUrl != null &&
+        medicine.imageUrl!.isNotEmpty &&
+        Uri.tryParse(medicine.imageUrl!)?.hasAbsolutePath == true) {
       imageWidget = Image.network(
         medicine.imageUrl!,
         fit: BoxFit.cover,
@@ -524,12 +647,19 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         height: 140,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF636AE8)),
+              ));
         },
-        errorBuilder: (context, error, stackTrace) => const Icon(Icons.medication_liquid_outlined, size: 90, color: Color(0xFF636AE8)),
+        errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.medication_liquid_outlined,
+            size: 90,
+            color: Color(0xFF636AE8)),
       );
     } else {
-      imageWidget = const Icon(Icons.medication_liquid_outlined, size: 90, color: Color(0xFF636AE8));
+      imageWidget = const Icon(Icons.medication_liquid_outlined,
+          size: 90, color: Color(0xFF636AE8));
     }
 
     return Container(
@@ -537,9 +667,13 @@ class _ExchangeScreenState extends State<ExchangeScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
+        border:
+        Border.all(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF636AE8).withOpacity(0.15), blurRadius: 15, spreadRadius: 2),
+          BoxShadow(
+              color: const Color(0xFF636AE8).withOpacity(0.15),
+              blurRadius: 15,
+              spreadRadius: 2),
         ],
       ),
       child: ClipRRect(
@@ -556,20 +690,25 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                 children: [
                   Container(
                     height: 140,
-                    decoration: BoxDecoration(color: const Color(0xFF636AE8).withOpacity(0.2)),
+                    decoration:
+                    BoxDecoration(color: const Color(0xFF636AE8).withOpacity(0.2)),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(20)),
                           child: imageWidget,
                         ),
                         Positioned(
-                          top: 5, right: 5,
+                          top: 5,
+                          right: 5,
                           child: Container(
                             padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                            child: const Icon(Icons.swap_horiz, color: Colors.white, size: 16),
+                            decoration: const BoxDecoration(
+                                color: Colors.green, shape: BoxShape.circle),
+                            child: const Icon(Icons.swap_horiz,
+                                color: Colors.white, size: 16),
                           ),
                         ),
                       ],
@@ -581,30 +720,63 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(medicine.medicineName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(medicine.medicineName,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            Icon(Icons.store_outlined, size: 12, color: Colors.white.withOpacity(0.7)),
+                            Icon(Icons.store_outlined,
+                                size: 12, color: Colors.white.withOpacity(0.7)),
                             const SizedBox(width: 4),
-                            Expanded(child: Text('From: ${medicine.pharmacyName}', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)), overflow: TextOverflow.ellipsis)),
+                            Expanded(
+                                child: Text('From: ${medicine.pharmacyName}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.white.withOpacity(0.7)),
+                                    overflow: TextOverflow.ellipsis)),
+                            const SizedBox(width: 4),
+                            InkWell(
+                              onTap: () => _showMapDialog(
+                                  medicine.pharmacyName,
+                                  medicine.pharmacyLatitude,
+                                  medicine.pharmacyLongitude),
+                              child: const Icon(Icons.location_on_outlined,
+                                  size: 16, color: Color(0xFF636AE8)),
+                            )
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(Icons.calendar_today_outlined, size: 11, color: Colors.white.withOpacity(0.7)),
-                            const SizedBox(width: 4),
-                            Text('Exp: ${medicine.medicineExpiryDate}', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
-                          ],
-                        ),
+                        // -- REMOVED --: The following SizedBox and Row displaying the expiry date have been removed.
+                        // const SizedBox(height: 4),
+                        // Row(
+                        //   children: [
+                        //     Icon(Icons.calendar_today_outlined,
+                        //         size: 11, color: Colors.white.withOpacity(0.7)),
+                        //     const SizedBox(width: 4),
+                        //     Text('Exp: ${medicine.medicineExpiryDate}',
+                        //         style: TextStyle(
+                        //             fontSize: 11,
+                        //             color: Colors.white.withOpacity(0.7))),
+                        //   ],
+                        // ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('${medicine.medicineQuantityToSell} units', style: const TextStyle(fontSize: 13, color: Colors.white)),
-                            Text('\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}', style: const TextStyle(fontSize: 17, color: Color(0xFF4CAF50), fontWeight: FontWeight.bold)),
+                            Text('${medicine.medicineQuantityToSell} units',
+                                style: const TextStyle(
+                                    fontSize: 13, color: Colors.white)),
+                            Text(
+                                '\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontSize: 17,
+                                    color: Color(0xFF4CAF50),
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
@@ -623,8 +795,10 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                   backgroundColor: const Color(0xFF636AE8),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  textStyle: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ),
@@ -644,11 +818,14 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             return Container(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+              padding: EdgeInsets.fromLTRB(
+                  24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
               decoration: BoxDecoration(
                 color: const Color(0xFF0F0F1A),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-                border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
+                borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(25)),
+                border:
+                Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -664,21 +841,38 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                   ),
                   const Text(
                     'Confirm Exchange',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                   const SizedBox(height: 24),
                   ListTile(
-                    leading: const Icon(Icons.medication_outlined, color: Color(0xFF636AE8), size: 30),
-                    title: Text(medicine.medicineName, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
-                    subtitle: Text('From: ${medicine.pharmacyName}', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16)),
-                    trailing: Text('\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}', style: const TextStyle(color: Color(0xFF4CAF50), fontSize: 18, fontWeight: FontWeight.bold)),
+                    leading: const Icon(Icons.medication_outlined,
+                        color: Color(0xFF636AE8), size: 30),
+                    title: Text(medicine.medicineName,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 18)),
+                    subtitle: Text('From: ${medicine.pharmacyName}',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 16)),
+                    trailing: Text(
+                        '\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}',
+                        style: const TextStyle(
+                            color: Color(0xFF4CAF50),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF636AE8), size: 30),
+                        icon: const Icon(Icons.remove_circle_outline,
+                            color: Color(0xFF636AE8), size: 30),
                         onPressed: () {
                           if (quantityToBuy > 1) {
                             setModalState(() {
@@ -687,21 +881,30 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                           }
                         },
                       ),
-                      Text(quantityToBuy.toString(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
+                      Text(quantityToBuy.toString(),
+                          style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white)),
                       IconButton(
-                        icon: const Icon(Icons.add_circle_outline, color: Color(0xFF636AE8), size: 30),
+                        icon: const Icon(Icons.add_circle_outline,
+                            color: Color(0xFF636AE8), size: 30),
                         onPressed: () {
-                          if (quantityToBuy < int.parse(medicine.medicineQuantityToSell)) {
+                          if (quantityToBuy <
+                              int.parse(medicine.medicineQuantityToSell)) {
                             setModalState(() {
                               quantityToBuy++;
                             });
                           } else {
                             _scaffoldMessengerKey.currentState?.showSnackBar(
                               const SnackBar(
-                                content: Text('Cannot buy more than available quantity.'),
+                                content: Text(
+                                    'Cannot buy more than available quantity.'),
                                 backgroundColor: Colors.orangeAccent,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                    BorderRadius.all(Radius.circular(10))),
                               ),
                             );
                           }
@@ -712,7 +915,10 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                   const SizedBox(height: 16),
                   Text(
                     'Total: \$${(quantityToBuy * double.parse(medicine.medicinePriceToSell)).toStringAsFixed(2)}',
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF4CAF50)),
+                    style: const TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4CAF50)),
                   ),
                   const SizedBox(height: 24),
                   PulsingActionButton(
@@ -726,7 +932,9 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             content: Text('Sending order...'),
                             backgroundColor: Colors.blueAccent,
                             behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                BorderRadius.all(Radius.circular(10))),
                           ),
                         );
                       }
@@ -743,10 +951,13 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                         if (mounted) {
                           _scaffoldMessengerKey.currentState?.showSnackBar(
                             SnackBar(
-                              content: Text('Failed to place order: ${e.toString()}'),
+                              content:
+                              Text('Failed to place order: ${e.toString()}'),
                               backgroundColor: Colors.red,
                               behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                  BorderRadius.all(Radius.circular(10))),
                             ),
                           );
                         }
@@ -756,7 +967,10 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                   const SizedBox(height: 12),
                   TextButton(
                     onPressed: () => Navigator.pop(modalContext),
-                    child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16)),
+                    child: Text('Cancel',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 16)),
                   ),
                 ],
               ),

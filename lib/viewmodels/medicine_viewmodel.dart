@@ -1,3 +1,5 @@
+// lib/viewmodels/medicine_viewmodel.dart
+
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/medicine_model.dart';
@@ -21,9 +23,7 @@ class MedicineViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String get error => _error;
 
-  // --- ✅ التعديل: Getter جديد لجلب قائمة أسماء الأدوية للمقارنة ---
   List<String> get allMedicineNames => _originalMedicinesList.map((med) => med.name).toList();
-  // ----------------------------------------------------------------
 
   Future<void> loadMedicines({String? pharmacyId, bool forceLoadAll = false}) async {
     _isLoading = true;
@@ -49,6 +49,22 @@ class MedicineViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  // -- MODIFIED --: This method is kept for potential other uses.
+  void removeMedicineById(String medicineId) {
+    _originalMedicinesList.removeWhere((medicine) => medicine.id == medicineId);
+    _medicines.removeWhere((medicine) => medicine.id == medicineId);
+    notifyListeners();
+  }
+
+  // -- ADDED --: New, more robust method to remove a medicine by a composite key.
+  // This ensures the correct medicine is removed from the home screen.
+  void removeMedicineByNameAndPharmacy({required String name, required String pharmacyId}) {
+    _originalMedicinesList.removeWhere((med) => med.name == name && med.pharmacyId == pharmacyId);
+    _medicines.removeWhere((med) => med.name == name && med.pharmacyId == pharmacyId);
+    notifyListeners();
+  }
+
 
   Future<void> searchMedicines(String query, {String? pharmacyId}) async {
     _isLoading = true;

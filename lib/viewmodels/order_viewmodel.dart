@@ -1,15 +1,16 @@
 // lib/viewmodels/order_viewmodel.dart
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_pharma_net/models/order_model.dart';
 import 'package:smart_pharma_net/models/important_notification_model.dart';
 import 'package:smart_pharma_net/repositories/order_repository.dart';
-import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart'; // -- إضافة --
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/base_viewmodel.dart';
 
 class OrderViewModel extends BaseViewModel {
   final OrderRepository _orderRepository;
-  final AuthViewModel _authViewModel; // -- إضافة --
+  final AuthViewModel _authViewModel;
 
   List<OrderModel> _incomingOrders = [];
   List<ImportantNotificationModel> _importantNotifications = [];
@@ -18,7 +19,6 @@ class OrderViewModel extends BaseViewModel {
 
   static const String _lastReadTimestampKey = 'lastReadNotificationTimestamp';
 
-  // -- تعديل -- تم تحديث الـ constructor
   OrderViewModel(this._orderRepository, this._authViewModel) {
     _loadLastReadTimestamp();
   }
@@ -40,16 +40,13 @@ class OrderViewModel extends BaseViewModel {
     setLoading(true);
     setError(null);
     try {
-      // -- إضافة -- جلب الـ ID الخاص بالصيدلية
       final pharmacyId = await _authViewModel.getPharmacyId();
       if (pharmacyId == null) {
-        // إذا لم يكن المستخدم صيدلية، لا تجلب أي طلبات
         _incomingOrders = [];
         setLoading(false);
         return;
       }
 
-      // -- تعديل -- تمرير الـ ID إلى الـ Repository
       _incomingOrders = await _orderRepository.getIncomingOrdersForSeller(pharmacyId: pharmacyId);
 
       _incomingOrders.sort((a, b) {
@@ -68,17 +65,14 @@ class OrderViewModel extends BaseViewModel {
     setLoading(true);
     setError(null);
     try {
-      // -- إضافة -- جلب الـ ID الخاص بالصيدلية
       final pharmacyId = await _authViewModel.getPharmacyId();
       if (pharmacyId == null) {
-        // إذا لم يكن المستخدم صيدلية، لا تجلب أي إشعارات
         _importantNotifications = [];
         _unreadNotificationCount = 0;
         setLoading(false);
         return;
       }
 
-      // -- تعديل -- تمرير الـ ID إلى الـ Repository
       _importantNotifications = await _orderRepository.getImportantNotifications(pharmacyId: pharmacyId);
 
       _importantNotifications

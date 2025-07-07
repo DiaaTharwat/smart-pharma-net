@@ -14,8 +14,8 @@ import 'package:smart_pharma_net/repositories/exchange_repository.dart';
 import 'package:smart_pharma_net/viewmodels/exchange_viewmodel.dart';
 import 'package:smart_pharma_net/repositories/order_repository.dart';
 import 'package:smart_pharma_net/viewmodels/order_viewmodel.dart';
-import 'package:smart_pharma_net/repositories/purchase_repository.dart'; // <<<--- إضافة جديدة
-import 'package:smart_pharma_net/viewmodels/purchase_viewmodel.dart'; // <<<--- إضافة جديدة
+import 'package:smart_pharma_net/repositories/purchase_repository.dart';
+import 'package:smart_pharma_net/viewmodels/purchase_viewmodel.dart';
 import 'package:smart_pharma_net/repositories/subscription_repository.dart';
 import 'package:smart_pharma_net/viewmodels/subscription_viewmodel.dart';
 import 'package:smart_pharma_net/repositories/chat_ai_repository.dart';
@@ -50,11 +50,9 @@ void main() async {
         ProxyProvider<ApiService, OrderRepository>(
           update: (_, apiService, __) => OrderRepository(apiService),
         ),
-        // <<<--- إضافة جديدة ---<<<
         ProxyProvider<ApiService, PurchaseRepository>(
           update: (_, apiService, __) => PurchaseRepository(apiService),
         ),
-        // >>>--- نهاية الإضافة ---<<<
         ProxyProvider<ApiService, SubscriptionRepository>(
           update: (_, apiService, __) => SubscriptionRepository(apiService),
         ),
@@ -89,23 +87,21 @@ void main() async {
           ),
         ),
 
-        // -- تعديل --
-        // تم تغيير `ChangeNotifierProvider` إلى `ChangeNotifierProxyProvider`
-        // لكي يتم تمرير `AuthViewModel` إلى `ExchangeViewModel`
-        ChangeNotifierProxyProvider<AuthViewModel, ExchangeViewModel>(
+        // -- MODIFIED --: Changed to ChangeNotifierProxyProvider2 to pass both
+        // AuthViewModel and MedicineViewModel to ExchangeViewModel.
+        ChangeNotifierProxyProvider2<AuthViewModel, MedicineViewModel, ExchangeViewModel>(
           create: (context) => ExchangeViewModel(
             context.read<ExchangeRepository>(),
             context.read<AuthViewModel>(),
+            context.read<MedicineViewModel>(),
           ),
-          update: (context, authViewModel, previous) => ExchangeViewModel(
+          update: (context, authViewModel, medicineViewModel, previous) => ExchangeViewModel(
             context.read<ExchangeRepository>(),
             authViewModel,
+            medicineViewModel,
           ),
         ),
 
-        // -- تعديل --
-        // تم تغيير `ChangeNotifierProvider` إلى `ChangeNotifierProxyProvider`
-        // لكي يتم تمرير `AuthViewModel` إلى `OrderViewModel`
         ChangeNotifierProxyProvider<AuthViewModel, OrderViewModel>(
           create: (context) => OrderViewModel(
             context.read<OrderRepository>(),
@@ -117,16 +113,11 @@ void main() async {
           ),
         ),
 
-        // <<<--- إضافة جديدة ---<<<
         ChangeNotifierProxyProvider<PurchaseRepository, PurchaseViewModel>(
           create: (context) => PurchaseViewModel(context.read<PurchaseRepository>()),
           update: (context, repo, previous) => previous ?? PurchaseViewModel(repo),
         ),
-        // >>>--- نهاية الإضافة ---<<<
 
-        // -- تعديل --
-        // تم تغيير `ChangeNotifierProvider` إلى `ChangeNotifierProxyProvider`
-        // لكي يتم تمرير `AuthViewModel` إلى `SubscriptionViewModel`
         ChangeNotifierProxyProvider<AuthViewModel, SubscriptionViewModel>(
           create: (context) => SubscriptionViewModel(
             context.read<SubscriptionRepository>(),
