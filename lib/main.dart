@@ -79,11 +79,10 @@ void main() async {
           previous ?? AuthViewModel(authRepo, apiService),
         ),
         ChangeNotifierProvider<PharmacyViewModel>(
-          create: (context) =>
-              PharmacyViewModel(
-                context.read<PharmacyRepository>(),
-                context.read<MedicineRepository>(),
-              ),
+          create: (context) => PharmacyViewModel(
+            context.read<PharmacyRepository>(),
+            context.read<MedicineRepository>(),
+          ),
         ),
         ChangeNotifierProvider<MedicineViewModel>(
           create: (context) => MedicineViewModel(
@@ -91,17 +90,19 @@ void main() async {
             context.read<PharmacyRepository>(),
           ),
         ),
-        ChangeNotifierProxyProvider2<AuthViewModel, MedicineViewModel, ExchangeViewModel>(
+        ChangeNotifierProxyProvider2<AuthViewModel, MedicineViewModel,
+            ExchangeViewModel>(
           create: (context) => ExchangeViewModel(
             context.read<ExchangeRepository>(),
             context.read<AuthViewModel>(),
             context.read<MedicineViewModel>(),
           ),
-          update: (context, authViewModel, medicineViewModel, previous) => ExchangeViewModel(
-            context.read<ExchangeRepository>(),
-            authViewModel,
-            medicineViewModel,
-          ),
+          update: (context, authViewModel, medicineViewModel, previous) =>
+              ExchangeViewModel(
+                context.read<ExchangeRepository>(),
+                authViewModel,
+                medicineViewModel,
+              ),
         ),
         ChangeNotifierProxyProvider<AuthViewModel, OrderViewModel>(
           create: (context) => OrderViewModel(
@@ -114,8 +115,10 @@ void main() async {
           ),
         ),
         ChangeNotifierProxyProvider<PurchaseRepository, PurchaseViewModel>(
-          create: (context) => PurchaseViewModel(context.read<PurchaseRepository>()),
-          update: (context, repo, previous) => previous ?? PurchaseViewModel(repo),
+          create: (context) =>
+              PurchaseViewModel(context.read<PurchaseRepository>()),
+          update: (context, repo, previous) =>
+          previous ?? PurchaseViewModel(repo),
         ),
         ChangeNotifierProxyProvider<AuthViewModel, SubscriptionViewModel>(
           create: (context) => SubscriptionViewModel(
@@ -129,12 +132,15 @@ void main() async {
             authViewModel,
           ),
         ),
-        // =================== الجزء الذي تم تصحيحه ===================
-        ChangeNotifierProxyProvider<DashboardRepository, DashboardViewModel>(
-          create: (context) => DashboardViewModel(context.read<DashboardRepository>()),
-          update: (context, repo, previous) => previous ?? DashboardViewModel(repo),
+        ChangeNotifierProxyProvider2<DashboardRepository, AuthViewModel,
+            DashboardViewModel>(
+          create: (context) => DashboardViewModel(
+            context.read<DashboardRepository>(),
+            context.read<AuthViewModel>(),
+          ),
+          update: (context, repo, authVm, previous) =>
+          previous ?? DashboardViewModel(repo, authVm),
         ),
-        // ==========================================================
       ],
       child: const MyApp(),
     ),

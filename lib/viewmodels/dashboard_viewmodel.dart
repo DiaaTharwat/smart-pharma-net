@@ -1,47 +1,66 @@
-// lib/viewmodels/dashboard_view_model.dart
+// lib/viewmodels/dashboard_viewmodel.dart
 
 import 'package:flutter/material.dart';
 import 'package:smart_pharma_net/models/dashboard_model.dart';
 import 'package:smart_pharma_net/repositories/dashboard_repository.dart';
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 
 class DashboardViewModel extends ChangeNotifier {
   final DashboardRepository _repository;
+  final AuthViewModel _authViewModel;
+
   DashboardStats? _stats;
   bool _isLoading = false;
   String? _errorMessage;
-  int? _selectedPharmacyId;
+
+  Map<String, dynamic>? _adminDashboardData;
 
   DashboardStats? get stats => _stats;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  int? get selectedPharmacyId => _selectedPharmacyId;
 
-  DashboardViewModel(this._repository);
+  DashboardViewModel(this._repository, this._authViewModel);
 
-  void selectPharmacy(int? pharmacyId) {
-    if (_selectedPharmacyId != pharmacyId) {
-      _selectedPharmacyId = pharmacyId;
-      fetchDashboardStats(pharmacyId: _selectedPharmacyId);
-    }
-  }
-
-  Future<void> fetchDashboardStats({int? pharmacyId}) async {
+  Future<void> fetchDashboardStats() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _stats = await _repository.getDashboardStats(pharmacyId: pharmacyId ?? _selectedPharmacyId);
-    } catch (e) {
-      // =================== الجزء الذي تم تعديله بذكاء ===================
-      // نتعامل مع خطأ 404 بشكل خاص
-      if (e.toString().contains('404')) {
-        _errorMessage = "Dashboard feature is not available on the server yet. Please contact backend support.";
-      } else {
-        _errorMessage = "An error occurred: ${e.toString()}";
+      // الحالة الأولى: أدمن في الوضع العام
+      if (_authViewModel.isAdmin && !_authViewModel.isImpersonating) {
+        _adminDashboardData = await _repository.getAdminDashboardData();
+        _stats = DashboardStats.fromJson(_adminDashboardData ?? {});
       }
-      print(_errorMessage);
-      // =================================================================
+      // الحالة الثانية: صيدلية مسجلة دخول
+      else if (_authViewModel.isPharmacy) {
+        final pharmacyData = await _repository.getLoggedInPharmacyDashboardData();
+        _stats = DashboardStats.fromJson(pharmacyData ?? {}, isFromSinglePharmacy: true);
+      }
+      // الحالة الثالثة: أدمن يتقمص دور صيدلية
+      else if (_authViewModel.isImpersonating) {
+        if (_adminDashboardData == null) {
+          _adminDashboardData = await _repository.getAdminDashboardData();
+        }
+
+        final List pharmacies = _adminDashboardData?['pharmacies'] as List? ?? [];
+        final pharmacyJson = pharmacies.firstWhere(
+              (p) => p['id'].toString() == _authViewModel.activePharmacyId,
+          orElse: () => null,
+        );
+
+        if (pharmacyJson != null) {
+          _stats = DashboardStats.fromSinglePharmacyImpersonation(pharmacyJson);
+        } else {
+          _stats = DashboardStats();
+          _errorMessage = "Could not find stats for the selected pharmacy.";
+        }
+      }
+
+    } catch (e) {
+      _stats = DashboardStats();
+      _errorMessage = "Failed to load dashboard. Please try again.";
+      print("Error in DashboardViewModel: ${e.toString()}");
     } finally {
       _isLoading = false;
       notifyListeners();

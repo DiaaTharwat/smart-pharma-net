@@ -61,10 +61,11 @@ class _MenuBarScreenState extends State<MenuBarScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authViewModel = context.read<AuthViewModel>();
       if (authViewModel.isAdmin) {
-        context.read<PharmacyViewModel>().loadPharmacies(
-            searchQuery: '', authViewModel: authViewModel);
+        context
+            .read<PharmacyViewModel>()
+            .loadPharmacies(searchQuery: '', authViewModel: authViewModel);
       }
-      context.read<DashboardViewModel>().fetchDashboardStats();
+      // لا داعي لاستدعاء الداشبورد من هنا، ستستدعى من شاشتها
     });
   }
 
@@ -95,14 +96,16 @@ class _MenuBarScreenState extends State<MenuBarScreen>
           borderRadius: BorderRadius.circular(15),
           side: BorderSide(color: const Color(0xFF636AE8).withOpacity(0.5)),
         ),
-        title: const Text('Pharmacy Not Selected', style: TextStyle(color: Colors.white)),
+        title: const Text('Pharmacy Not Selected',
+            style: TextStyle(color: Colors.white)),
         content: const Text(
             'Please select a pharmacy from the dropdown menu first to access this feature.',
             style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK', style: TextStyle(color: Color(0xFF636AE8))),
+            child:
+            const Text('OK', style: TextStyle(color: Color(0xFF636AE8))),
           ),
         ],
       ),
@@ -121,7 +124,8 @@ class _MenuBarScreenState extends State<MenuBarScreen>
     Color? iconColor,
   }) {
     final color = isDisabled ? Colors.grey.shade600 : Colors.white;
-    final finalIconColor = iconColor ?? (isDisabled ? Colors.grey.shade600 : const Color(0xFF636AE8));
+    final finalIconColor =
+        iconColor ?? (isDisabled ? Colors.grey.shade600 : const Color(0xFF636AE8));
 
     return SlideTransition(
       position: _slideAnimation,
@@ -140,9 +144,11 @@ class _MenuBarScreenState extends State<MenuBarScreen>
             ),
             title: Text(
               title,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: color),
+              style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w500, color: color),
             ),
-            trailing: Icon(Icons.arrow_forward_ios, size: 20, color: color.withOpacity(0.7)),
+            trailing: Icon(Icons.arrow_forward_ios,
+                size: 20, color: color.withOpacity(0.7)),
             onTap: isDisabled ? null : onTap,
           ),
         ),
@@ -153,10 +159,13 @@ class _MenuBarScreenState extends State<MenuBarScreen>
   Widget _buildPharmacySelector(BuildContext context) {
     final authVm = context.watch<AuthViewModel>();
     final pharmacyVm = context.watch<PharmacyViewModel>();
-    final dashboardVm = context.read<DashboardViewModel>();
+    final dashboardVm = context.read<DashboardViewModel>(); // <-- للوصول للداشبورد
 
     if (pharmacyVm.isLoading) {
-      return const Center(child: LinearProgressIndicator(backgroundColor: Colors.transparent, color: Color(0xFF636AE8)));
+      return const Center(
+          child: LinearProgressIndicator(
+              backgroundColor: Colors.transparent,
+              color: Color(0xFF636AE8)));
     }
 
     return Container(
@@ -169,43 +178,49 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: authVm.isImpersonating ? authVm.activePharmacyId.toString() : 'owner_mode',
+          value: authVm.isImpersonating
+              ? authVm.activePharmacyId.toString()
+              : 'owner_mode',
           isExpanded: true,
           dropdownColor: const Color(0xFF0D0D1A),
-          icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70),
-          hint: const Text("Select Pharmacy", style: TextStyle(color: Colors.white70)),
+          icon: const Icon(Icons.arrow_drop_down_rounded,
+              color: Colors.white70),
+          hint: const Text("Select Pharmacy",
+              style: TextStyle(color: Colors.white70)),
           items: [
             const DropdownMenuItem(
               value: 'owner_mode',
-              child: Text("Owner Mode", style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
+              child: Text("Owner Mode",
+                  style: TextStyle(
+                      color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
             ),
-            ...pharmacyVm.pharmacies.map<DropdownMenuItem<String>>((PharmacyModel pharmacy) {
+            ...pharmacyVm.pharmacies
+                .map<DropdownMenuItem<String>>((PharmacyModel pharmacy) {
               return DropdownMenuItem<String>(
                 value: pharmacy.id.toString(),
-                child: Text(pharmacy.name, style: const TextStyle(color: Colors.white)),
+                child:
+                Text(pharmacy.name, style: const TextStyle(color: Colors.white)),
               );
             }).toList(),
           ],
+          // =================== الكود النهائي الصحيح ===================
           onChanged: (String? newValue) {
             final orderVm = context.read<OrderViewModel>();
 
             if (newValue == 'owner_mode') {
               authVm.stopImpersonation();
-              dashboardVm.selectPharmacy(null);
             } else if (newValue != null) {
-              final selectedPharmacy = pharmacyVm.pharmacies.firstWhere((p) => p.id.toString() == newValue);
+              final selectedPharmacy = pharmacyVm.pharmacies
+                  .firstWhere((p) => p.id.toString() == newValue);
               authVm.impersonatePharmacy(selectedPharmacy);
-
-              // =================== الجزء الذي تم تصحيحه ===================
-              // نقوم بتحويل النص (newValue) إلى رقم قبل إرساله
-              final pharmacyId = int.tryParse(newValue);
-              dashboardVm.selectPharmacy(pharmacyId);
-              // ==========================================================
             }
 
+            // بعد أي تغيير، قم بتحديث بيانات الداشبورد والإشعارات والطلبات
+            dashboardVm.fetchDashboardStats();
             orderVm.loadImportantNotifications();
             orderVm.loadIncomingOrders();
           },
+          // ==========================================================
         ),
       ),
     );
@@ -223,7 +238,8 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       accountTypeText = 'Owner (Impersonating)';
     } else if (authViewModel.isAdmin) {
       final email = authViewModel.ownerEmail;
-      welcomeText = 'Welcome, ${(email != null && email.isNotEmpty) ? email.split('@')[0] : 'Owner'}';
+      welcomeText =
+      'Welcome, ${(email != null && email.isNotEmpty) ? email.split('@')[0] : 'Owner'}';
       accountTypeText = 'Owner Account';
     } else if (authViewModel.isPharmacy) {
       welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
@@ -235,7 +251,8 @@ class _MenuBarScreenState extends State<MenuBarScreen>
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, toolbarHeight: 0),
+      appBar: AppBar(
+          backgroundColor: Colors.transparent, elevation: 0, toolbarHeight: 0),
       body: InteractiveParticleBackground(
         child: Column(
           children: [
@@ -248,20 +265,22 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 28),
-                          onPressed: (){ Navigator.of(context).pop(); },
+                          icon: const Icon(Icons.arrow_back_ios_new,
+                              color: Colors.white, size: 28),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
                         ),
                         const Spacer(),
-
-                        if(authViewModel.isAdmin)
+                        if (authViewModel.isAdmin)
                           IconButton(
-                            icon: const Icon(Icons.settings, color: Colors.white, size: 28),
+                            icon: const Icon(Icons.settings,
+                                color: Colors.white, size: 28),
                             onPressed: () {
                               _navigateTo(context, const SettingsScreen());
                             },
                             tooltip: 'Settings',
                           ),
-
                         if (authViewModel.canActAsPharmacy)
                           const NotificationIcon(),
                       ],
@@ -273,9 +292,12 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                         children: [
                           CircleAvatar(
                             radius: 35,
-                            backgroundColor: const Color(0xFF636AE8).withOpacity(0.5),
+                            backgroundColor:
+                            const Color(0xFF636AE8).withOpacity(0.5),
                             child: Icon(
-                              authViewModel.isAdmin ? Icons.admin_panel_settings : Icons.storefront,
+                              authViewModel.isAdmin
+                                  ? Icons.admin_panel_settings
+                                  : Icons.storefront,
                               size: 40,
                               color: Colors.white,
                             ),
@@ -297,7 +319,9 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                                 const SizedBox(height: 4),
                                 Text(
                                   accountTypeText,
-                                  style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16),
+                                  style: TextStyle(
+                                      color: Colors.white.withOpacity(0.8),
+                                      fontSize: 16),
                                 ),
                               ],
                             ),
@@ -309,7 +333,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                 ),
               ),
             ),
-
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 20),
@@ -319,12 +342,12 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                     title: 'Home',
                     onTap: () {
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const HomeScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const HomeScreen()),
                             (Route<dynamic> route) => false,
                       );
                     },
                   ),
-
                   if (authViewModel.isAdmin || authViewModel.isPharmacy) ...[
                     _buildMenuItem(
                       icon: Icons.dashboard_rounded,
@@ -332,13 +355,13 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       onTap: () => _navigateTo(context, const DashboardScreen()),
                     ),
                   ],
-
                   if (authViewModel.isAdmin) ...[
                     _buildPharmacySelector(context),
                     _buildMenuItem(
                       icon: Icons.store_mall_directory,
                       title: 'Manage Pharmacies',
-                      onTap: () => _navigateTo(context, const AvailablePharmaciesScreen()),
+                      onTap: () => _navigateTo(
+                          context, const AvailablePharmaciesScreen()),
                     ),
                     Divider(color: Colors.white.withOpacity(0.2), height: 20),
                     _buildMenuItem(
@@ -361,13 +384,15 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       _buildMenuItem(
                         icon: Icons.shopping_cart,
                         title: 'Incoming Orders',
-                        onTap: () => _navigateTo(context, const PharmacyOrdersScreen()),
+                        onTap: () =>
+                            _navigateTo(context, const PharmacyOrdersScreen()),
                       ),
                   ] else if (authViewModel.isPharmacy) ...[
                     _buildMenuItem(
                       icon: Icons.store,
                       title: 'My Pharmacy Details',
-                      onTap: () => _navigateTo(context, const AvailablePharmaciesScreen()),
+                      onTap: () => _navigateTo(
+                          context, const AvailablePharmaciesScreen()),
                     ),
                     _buildMenuItem(
                       icon: Icons.swap_horiz,
@@ -382,10 +407,10 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                     _buildMenuItem(
                       icon: Icons.shopping_cart,
                       title: 'My Incoming Orders',
-                      onTap: () => _navigateTo(context, const PharmacyOrdersScreen()),
+                      onTap: () =>
+                          _navigateTo(context, const PharmacyOrdersScreen()),
                     ),
                   ],
-
                   Divider(color: Colors.white.withOpacity(0.2), height: 40),
                   _buildMenuItem(
                     icon: Icons.logout,

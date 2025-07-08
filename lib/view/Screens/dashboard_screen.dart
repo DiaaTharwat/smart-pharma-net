@@ -1,8 +1,13 @@
 // lib/view/Screens/dashboard_screen.dart
 
+import 'dart:ui';
+import 'package:animate_do/animate_do.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart'; // <-- تمت الإضافة
+import 'package:smart_pharma_net/models/dashboard_model.dart';
+import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
+import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/dashboard_viewmodel.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -13,6 +18,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  int touchedIndex = -1;
+
   @override
   void initState() {
     super.initState();
@@ -23,137 +30,88 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authViewModel = context.watch<AuthViewModel>();
+    final dashboardTitle = authViewModel.isImpersonating
+        ? 'Dashboard: ${authViewModel.activePharmacyName}'
+        : (authViewModel.isPharmacy ? 'My Dashboard' : 'Overall Dashboard');
+
     return Scaffold(
-      extendBodyBehindAppBar: true, // للسماح للخلفية بالظهور خلف شريط العنوان
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text("Dashboard", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent, // جعل شريط العنوان شفافاً
+        title: Text(dashboardTitle,
+            style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                shadows: [Shadow(blurRadius: 5, color: Colors.black54)])),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: InteractiveParticleBackground( // استخدام نفس الخلفية التفاعلية
+      body: InteractiveParticleBackground(
         child: SafeArea(
           child: Consumer<DashboardViewModel>(
             builder: (context, viewModel, child) {
               if (viewModel.isLoading && viewModel.stats == null) {
-                return const Center(child: CircularProgressIndicator(color: Colors.white));
+                return const Center(
+                    child: CircularProgressIndicator(color: Colors.white));
               }
-
               if (viewModel.errorMessage != null) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.error_outline, color: Colors.redAccent, size: 60),
-                        const SizedBox(height: 20),
-                        Text(
-                          viewModel.errorMessage!,
-                          style: const TextStyle(color: Colors.white70, fontSize: 16),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 30),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF636AE8).withOpacity(0.8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                          ),
-                          onPressed: () => viewModel.fetchDashboardStats(),
-                          icon: const Icon(Icons.refresh, color: Colors.white),
-                          label: const Text("Retry", style: TextStyle(color: Colors.white)),
-                        )
-                      ],
-                    ),
-                  ),
-                );
+                return Center( /* Error UI */);
               }
-
               if (viewModel.stats == null) {
-                return const Center(child: Text("No data available.", style: TextStyle(color: Colors.white70)));
+                return const Center(
+                    child: Text("No data available.",
+                        style: TextStyle(color: Colors.white70)));
               }
 
               final stats = viewModel.stats!;
 
               return RefreshIndicator(
-                onRefresh: () => viewModel.fetchDashboardStats(pharmacyId: viewModel.selectedPharmacyId),
+                onRefresh: () => viewModel.fetchDashboardStats(),
                 backgroundColor: const Color(0xFF0F0F1A),
                 color: Colors.white,
                 child: ListView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   children: [
-                    if (stats.totalPharmacies > 0) ...[
-                      _buildSectionTitle(context, 'Network Overview'),
-                      _buildStatCard(
-                        title: 'Total Pharmacies',
-                        value: stats.totalPharmacies.toString(),
-                        icon: Icons.local_hospital_outlined,
-                        color: Colors.cyanAccent,
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    _buildStatCard(
-                      title: 'Total Medicines Stock',
-                      value: stats.totalMedicines.toString(),
-                      icon: Icons.medical_services_outlined,
-                      color: Colors.lightGreenAccent,
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSectionTitle(context, 'Order Statistics'),
-                    GridView.count(
-                      crossAxisCount: 3,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      children: [
-                        _buildSmallStatCard(
-                          title: 'Pending',
-                          value: stats.pendingOrders.toString(),
-                          icon: Icons.hourglass_top_rounded,
-                          color: Colors.orangeAccent,
-                        ),
-                        _buildSmallStatCard(
-                          title: 'Completed',
-                          value: stats.completedOrders.toString(),
-                          icon: Icons.check_circle_outline_rounded,
-                          color: Colors.greenAccent,
-                        ),
-                        _buildSmallStatCard(
-                          title: 'Cancelled',
-                          value: stats.cancelledOrders.toString(),
-                          icon: Icons.cancel_outlined,
-                          color: Colors.redAccent,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    _buildSectionTitle(context, 'Transaction Summary'),
+                    const SizedBox(height: 10),
+
+                    // --- Full-width Stat Cards ---
+                    if (authViewModel.isAdmin && !authViewModel.isImpersonating)
+                      FadeInUp(delay: const Duration(milliseconds: 100), child: _buildMetricCard('Total Pharmacies', stats.totalPharmacies.toString(), Icons.business_center_outlined, Colors.cyan)),
+                    if (stats.hasMedicineStats)
+                      FadeInUp(delay: const Duration(milliseconds: 200), child: _buildMetricCard('Medicines Stock', stats.totalMedicines.toString(), Icons.inventory_2_outlined, Colors.lightGreenAccent)),
+
+                    // --- Two Cards in a Row ---
                     Row(
                       children: [
-                        Expanded(
-                          child: _buildSmallStatCard(
-                            title: 'Total Sells',
-                            value: stats.totalSells.toString(),
-                            icon: Icons.arrow_upward_rounded,
-                            color: Colors.purpleAccent,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _buildSmallStatCard(
-                            title: 'Total Buys',
-                            value: stats.totalBuys.toString(),
-                            icon: Icons.arrow_downward_rounded,
-                            color: Colors.tealAccent,
-                          ),
-                        ),
+                        Expanded(child: FadeInLeft(delay: const Duration(milliseconds: 300), child: _buildMetricCard('Total Sells', stats.totalSells.toString(), Icons.arrow_upward_rounded, Colors.purpleAccent, isHalfWidth: true))),
+                        const SizedBox(width: 16),
+                        Expanded(child: FadeInRight(delay: const Duration(milliseconds: 300), child: _buildMetricCard('Total Buys', stats.totalBuys.toString(), Icons.arrow_downward_rounded, Colors.tealAccent, isHalfWidth: true))),
                       ],
                     ),
+
+                    const SizedBox(height: 16),
+                    _buildSectionDivider("Analytics"),
+
+                    // --- Compact and Impressive Charts ---
+                    FadeInUp(
+                      duration: const Duration(milliseconds: 500),
+                      delay: const Duration(milliseconds: 500),
+                      child: _buildTransactionsBarChart(stats),
+                    ),
+
+                    if (stats.hasOrderStats) ...[
+                      const SizedBox(height: 16),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 500),
+                        delay: const Duration(milliseconds: 600),
+                        child: _buildOrderStatusPieChart(stats),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
                   ],
                 ),
               );
@@ -164,54 +122,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 8.0, bottom: 12.0),
-      child: Text(
-        title,
-        style: TextStyle(
-          color: Colors.white.withOpacity(0.8),
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.2,
-        ),
-      ),
-    );
-  }
+  // ==================== التصميم النهائي الجديد ====================
 
-  Widget _buildStatCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
+  Widget _buildMetricCard(String title, String value, IconData icon, Color color, {bool isHalfWidth = false}) {
     return Container(
+      margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF636AE8).withOpacity(0.1),
+        color: Colors.white.withOpacity(0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
+        border: Border.all(color: Colors.white.withOpacity(0.15)),
       ),
-      child: Row(
+      child: isHalfWidth
+          ? Column(
         children: [
-          Icon(icon, size: 36, color: color),
-          const SizedBox(width: 20),
+          CircleAvatar(radius: 20, backgroundColor: color.withOpacity(0.25), child: Icon(icon, color: color, size: 22)),
+          const SizedBox(height: 12),
+          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
+          Text(title, style: const TextStyle(fontSize: 14, color: Colors.white70)),
+        ],
+      )
+          : Row(
+        children: [
+          CircleAvatar(radius: 22, backgroundColor: color.withOpacity(0.25), child: Icon(icon, color: color, size: 24)),
+          const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: const TextStyle(fontSize: 16, color: Colors.white70),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
+              Text(title, style: const TextStyle(fontSize: 16, color: Colors.white70, fontWeight: FontWeight.w500)),
+              Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
             ],
           ),
         ],
@@ -219,40 +158,161 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSmallStatCard({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF636AE8).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.2)),
+  Widget _buildSectionDivider(String title) {
+    return FadeIn(
+      delay: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 600),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Row(children: [
+          Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(title, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          ),
+          Expanded(child: Divider(color: Colors.white.withOpacity(0.2))),
+        ]),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 28, color: color),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: color,
+    );
+  }
+
+  // =================== المخططات بالتصميم النهائي والمحسن ===================
+  Widget _buildTransactionsBarChart(DashboardStats stats) {
+    return AspectRatio(
+      aspectRatio: 2.5, // تصغير ارتفاع المخطط
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: BarChart(
+          BarChartData(
+            alignment: BarChartAlignment.spaceAround,
+            barTouchData: BarTouchData(enabled: false),
+            titlesData: const FlTitlesData(show: false),
+            borderData: FlBorderData(show: false),
+            gridData: const FlGridData(show: false),
+            barGroups: [
+              _generateBarGroup(stats, 0, stats.totalSells.toDouble(), const [Color(0xfff869d5), Color(0xff5650de)], "Sells"),
+              _generateBarGroup(stats, 1, stats.totalBuys.toDouble(), const [Color(0xff43e794), Color(0xff29a0b1)], "Buys"),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  BarChartGroupData _generateBarGroup(DashboardStats stats, int x, double value, List<Color> gradientColors, String title) {
+    final double maxValue = (stats.totalSells + stats.totalBuys > 0) ? (stats.totalSells + stats.totalBuys) * 1.3 : 1;
+    return BarChartGroupData(
+      x: x,
+      barRods: [
+        BarChartRodData(
+          toY: value,
+          gradient: LinearGradient(colors: gradientColors, begin: Alignment.bottomCenter, end: Alignment.topCenter),
+          width: 50,
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
+          backDrawRodData: BackgroundBarChartRodData(show: true, toY: maxValue, color: Colors.white.withOpacity(0.1)),
+        ),
+      ],
+      // عرض العنوان والقيمة فوق كل عمود
+      showingTooltipIndicators: [0],
+    );
+  }
+
+  Widget _buildOrderStatusPieChart(DashboardStats stats) {
+    final totalOrders = (stats.pendingOrders ?? 0) + (stats.completedOrders ?? 0) + (stats.cancelledOrders ?? 0);
+    if(totalOrders == 0) return const SizedBox.shrink();
+
+    return AspectRatio(
+      aspectRatio: 2.5, // تصغير ارتفاع المخطط
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 1,
+              child: PieChart(
+                PieChartData(
+                  pieTouchData: PieTouchData(
+                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                      setState(() {
+                        if (!event.isInterestedForInteractions || pieTouchResponse == null || pieTouchResponse.touchedSection == null) {
+                          touchedIndex = -1; return;
+                        }
+                        touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                      });
+                    },
+                  ),
+                  borderData: FlBorderData(show: false),
+                  sectionsSpace: 3,
+                  centerSpaceRadius: 25,
+                  sections: [
+                    _generatePieSection(0, stats.pendingOrders?.toDouble() ?? 0, Colors.orangeAccent),
+                    _generatePieSection(1, stats.completedOrders?.toDouble() ?? 0, Colors.greenAccent),
+                    _generatePieSection(2, stats.cancelledOrders?.toDouble() ?? 0, Colors.redAccent),
+                  ],
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            Expanded(
+              flex: 1,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Indicator(color: Colors.orangeAccent, text: 'Pending', value: stats.pendingOrders ?? 0),
+                  const SizedBox(height: 8),
+                  _Indicator(color: Colors.greenAccent, text: 'Completed', value: stats.completedOrders ?? 0),
+                  const SizedBox(height: 8),
+                  _Indicator(color: Colors.redAccent, text: 'Cancelled', value: stats.cancelledOrders ?? 0),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  PieChartSectionData _generatePieSection(int index, double value, Color color){
+    final isTouched = index == touchedIndex;
+    final radius = isTouched ? 35.0 : 30.0;
+    final fontSize = isTouched ? 16.0 : 12.0;
+    return PieChartSectionData(
+        color: color,
+        value: value,
+        title: '${value.toInt()}',
+        radius: radius,
+        titleStyle: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            shadows: const [Shadow(color: Colors.black, blurRadius: 3)]));
+  }
+}
+
+class _Indicator extends StatelessWidget {
+  final Color color;
+  final String text;
+  final int value;
+
+  const _Indicator({required this.color, required this.text, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.rectangle, borderRadius: BorderRadius.circular(4), color: color)),
+        const SizedBox(width: 8),
+        Text(text, style: const TextStyle(fontSize: 14, color: Colors.white70)),
+        const Spacer(),
+        Text('$value', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color)),
+      ],
     );
   }
 }

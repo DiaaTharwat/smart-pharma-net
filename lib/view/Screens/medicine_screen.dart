@@ -1,13 +1,16 @@
-import 'dart:io'; // NEW: Added for File handling
+// lib/view/Screens/medicine_screen.dart
+
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart'; // NEW: Added for image picking
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/medicine_viewmodel.dart';
 import 'package:smart_pharma_net/view/Widgets/notification_icon.dart';
-import 'package:speech_to_text/speech_to_text.dart'; // NEW: Added for speech recognition
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart'; // NEW: Added for text recognition from image
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:string_similarity/string_similarity.dart'; // NEW: Import added
 
 import '../../models/medicine_model.dart';
 import 'add_medicine_screen.dart';
@@ -27,7 +30,6 @@ class _MedicineScreenState extends State<MedicineScreen>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // NEW: State variables for new features
   final SpeechToText _speechToText = SpeechToText();
   bool _speechEnabled = false;
   bool _isListening = false;
@@ -39,10 +41,9 @@ class _MedicineScreenState extends State<MedicineScreen>
     super.initState();
     _setupAnimations();
     _initializeData();
-    _initSpeech(); // NEW: Initialize speech recognition
+    _initSpeech();
   }
 
-  // NEW: Initialize speech-to-text
   void _initSpeech() async {
     _speechEnabled = await _speechToText.initialize(
       onError: (error) => print('Speech Recognition Error: $error'),
@@ -66,7 +67,6 @@ class _MedicineScreenState extends State<MedicineScreen>
     }
   }
 
-  // NEW: Start listening function
   void _startListening() async {
     if (!_isListening) {
       bool available = await _speechToText.initialize();
@@ -80,7 +80,8 @@ class _MedicineScreenState extends State<MedicineScreen>
               if (mounted) {
                 setState(() {
                   _searchController.text = result.recognizedWords;
-                  _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+                  _searchController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: _searchController.text.length));
                   _triggerSearch(result.recognizedWords);
                 });
               }
@@ -93,8 +94,6 @@ class _MedicineScreenState extends State<MedicineScreen>
     }
   }
 
-
-  // NEW: Stop listening function
   void _stopListening() async {
     if (_isListening) {
       await _speechToText.stop();
@@ -104,43 +103,67 @@ class _MedicineScreenState extends State<MedicineScreen>
     }
   }
 
-  // NEW: Pick image and recognize text
+  // MODIFIED: This function now has the intelligent search logic
   void _pickImageAndRecognizeText() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+    final medicineViewModel = context.read<MedicineViewModel>();
 
-    if (imageFile == null) return;
-
-    if (mounted) {
-      setState(() {
-        _selectedImage = File(imageFile.path);
-      });
+    if (medicineViewModel.allMedicineNames.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+            Text("Medicine list is not loaded yet. Please try again.")),
+      );
+      return;
     }
 
-    final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
-    final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? imageFile =
+      await picker.pickImage(source: ImageSource.gallery);
+      if (imageFile == null) return;
+      if (mounted) setState(() => _selectedImage = File(imageFile.path));
 
-    String extractedText = recognizedText.text;
-    if (extractedText.isNotEmpty) {
-      // Clean up text a bit (optional)
-      extractedText = extractedText.replaceAll('\n', ' ').trim();
-      _searchController.text = extractedText;
-      _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
-      _triggerSearch(extractedText);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Could not recognize any text in the image.")),
-      );
-      // Clear image if no text is found
-      if (mounted) {
-        setState(() {
-          _selectedImage = null;
-        });
+      final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
+      final RecognizedText recognizedText =
+      await _textRecognizer.processImage(inputImage);
+      final String fullTextFromImage = recognizedText.text;
+
+      if (fullTextFromImage.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Could not recognize any text.")),
+        );
+        _clearImageSearch();
+        return;
       }
+
+      final List<String> medicineNames = medicineViewModel.allMedicineNames;
+      final BestMatch bestMatch =
+      StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
+
+      if (bestMatch.bestMatch.rating != null &&
+          bestMatch.bestMatch.rating! > 0.2) {
+        final String foundMedicineName = bestMatch.bestMatch.target!;
+        _searchController.text = foundMedicineName;
+        _searchController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _searchController.text.length));
+        _triggerSearch(foundMedicineName);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+              Text("Could not find a matching medicine in your pharmacy.")),
+        );
+        _clearImageSearch();
+      }
+    } catch (e) {
+      print("Error picking image or recognizing text: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("An error occurred: $e")),
+      );
+      _clearImageSearch();
     }
   }
 
-  // NEW: Function to clear image and search
   void _clearImageSearch() {
     setState(() {
       _selectedImage = null;
@@ -149,15 +172,15 @@ class _MedicineScreenState extends State<MedicineScreen>
     });
   }
 
-  // NEW: Centralized search trigger
   void _triggerSearch(String query) {
     final authVm = context.read<AuthViewModel>();
     final pharmacyId = authVm.activePharmacyId;
     if (pharmacyId != null) {
-      context.read<MedicineViewModel>().searchMedicines(query, pharmacyId: pharmacyId);
+      context
+          .read<MedicineViewModel>()
+          .searchMedicines(query, pharmacyId: pharmacyId);
     }
   }
-
 
   void _setupAnimations() {
     _controller = AnimationController(
@@ -208,14 +231,241 @@ class _MedicineScreenState extends State<MedicineScreen>
     }
   }
 
-
   @override
   void dispose() {
     _searchController.dispose();
     _controller.dispose();
-    _textRecognizer.close(); // NEW: Dispose text recognizer
-    _speechToText.cancel(); // NEW: Cancel speech recognition
+    _textRecognizer.close();
+    _speechToText.cancel();
     super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authViewModel = context.watch<AuthViewModel>();
+    return WillPopScope(
+      onWillPop: () async {
+        await _handleBackNavigation();
+        return false;
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          toolbarHeight: 0,
+        ),
+        body: InteractiveParticleBackground(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new,
+                                color: Colors.white, size: 28),
+                            onPressed: _handleBackNavigation,
+                          ),
+                          if (authViewModel.isPharmacy)
+                            IconButton(
+                              icon: const Icon(Icons.menu,
+                                  color: Colors.white, size: 28),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const MenuBarScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          Expanded(
+                            child: Text(
+                              authViewModel.activePharmacyName ?? 'Medicines',
+                              style: const TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                      blurRadius: 10.0,
+                                      color: Color(0xFF636AE8))
+                                ],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh,
+                                color: Colors.white, size: 28),
+                            onPressed: _initializeData,
+                          ),
+                          if (authViewModel.canActAsPharmacy)
+                            const NotificationIcon(),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: SlideTransition(
+                          position: _slideAnimation,
+                          child: GlowingTextField(
+                            controller: _searchController,
+                            hintText:
+                            _isListening ? 'Listening...' : 'Search medicines...',
+                            onChanged: (value) {
+                              if (_selectedImage == null) {
+                                _triggerSearch(value);
+                              }
+                            },
+                            prefixIcon: _selectedImage != null
+                                ? Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  _selectedImage!,
+                                  height: 30,
+                                  width: 30,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            )
+                                : const Icon(Icons.search,
+                                color: Color(0xFF636AE8)),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_selectedImage != null)
+                                  IconButton(
+                                    icon: const Icon(Icons.close,
+                                        color: Colors.white70),
+                                    onPressed: _clearImageSearch,
+                                  ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.mic,
+                                    color: _isListening
+                                        ? Colors.redAccent
+                                        : Colors.white70,
+                                  ),
+                                  onPressed: _speechEnabled
+                                      ? (_isListening
+                                      ? _stopListening
+                                      : _startListening)
+                                      : null,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.camera_alt_outlined,
+                                      color: Colors.white70),
+                                  onPressed: _pickImageAndRecognizeText,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Consumer<MedicineViewModel>(
+                  builder: (context, viewModel, child) {
+                    if (viewModel.isLoading) {
+                      return const Center(
+                          child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF636AE8))));
+                    }
+                    if (viewModel.medicines.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.medication_outlined,
+                                size: 80, color: Colors.grey.shade600),
+                            const SizedBox(height: 20),
+                            Text('No medicines found',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    color: Colors.white.withOpacity(0.7))),
+                          ],
+                        ),
+                      );
+                    }
+                    final screenPadding = const EdgeInsets.all(20.0);
+                    final horizontalSpacing = 20.0;
+                    final verticalSpacing = 20.0;
+                    return RefreshIndicator(
+                      onRefresh: _initializeData,
+                      color: const Color(0xFF636AE8),
+                      backgroundColor: Colors.white.withOpacity(0.8),
+                      child: SingleChildScrollView(
+                        padding: screenPadding,
+                        child: Wrap(
+                          spacing: horizontalSpacing,
+                          runSpacing: verticalSpacing,
+                          alignment: WrapAlignment.start,
+                          children: viewModel.medicines.map((medicine) {
+                            final double screenWidth =
+                                MediaQuery.of(context).size.width;
+                            final double totalHorizontalPadding =
+                                screenPadding.left + screenPadding.right;
+                            final double totalSpacing = horizontalSpacing * 2;
+                            final double cardWidth = (screenWidth > 1200)
+                                ? (screenWidth -
+                                totalHorizontalPadding -
+                                totalSpacing) /
+                                3
+                                : (screenWidth > 800)
+                                ? (screenWidth -
+                                totalHorizontalPadding -
+                                horizontalSpacing) /
+                                2
+                                : (screenWidth - totalHorizontalPadding);
+                            return _buildMedicineCard(medicine, cardWidth);
+                          }).toList(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            final pharmacyId = authViewModel.activePharmacyId;
+            if (pharmacyId == null) return;
+
+            final result = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddMedicineScreen(pharmacyId: pharmacyId),
+              ),
+            );
+            if (result == true && mounted) {
+              _initializeData();
+            }
+          },
+          backgroundColor: const Color(0xFF636AE8),
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.add, color: Colors.white, size: 28),
+          label: const Text('Add Medicine',
+              style:
+              TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+          elevation: 8,
+        ),
+      ),
+    );
   }
 
   Widget _buildMedicineCard(MedicineModel medicine, double cardWidth) {
@@ -251,7 +501,8 @@ class _MedicineScreenState extends State<MedicineScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
+        border: Border.all(
+            color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF636AE8).withOpacity(0.15),
@@ -277,7 +528,8 @@ class _MedicineScreenState extends State<MedicineScreen>
                   alignment: Alignment.center,
                   children: [
                     ClipRRect(
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
                       child: imageWidget,
                     ),
                     if (medicine.canBeSell)
@@ -290,7 +542,8 @@ class _MedicineScreenState extends State<MedicineScreen>
                             color: Colors.green,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.swap_horiz, color: Colors.white, size: 16),
+                          child: const Icon(Icons.swap_horiz,
+                              color: Colors.white, size: 16),
                         ),
                       ),
                   ],
@@ -304,25 +557,32 @@ class _MedicineScreenState extends State<MedicineScreen>
                   children: [
                     Text(
                       medicine.name,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       medicine.category,
-                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.6)),
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.white.withOpacity(0.6)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Icon(Icons.calendar_today_outlined, size: 11, color: Colors.white.withOpacity(0.7)),
+                        Icon(Icons.calendar_today_outlined,
+                            size: 11, color: Colors.white.withOpacity(0.7)),
                         const SizedBox(width: 4),
                         Text(
                           'Exp: ${medicine.expiryDate}',
-                          style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)),
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.white.withOpacity(0.7)),
                         ),
                       ],
                     ),
@@ -337,7 +597,10 @@ class _MedicineScreenState extends State<MedicineScreen>
                         ),
                         Text(
                           '\$${medicine.price.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 17, color: Color(0xFF4CAF50), fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 17,
+                              color: Color(0xFF4CAF50),
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -346,198 +609,6 @@ class _MedicineScreenState extends State<MedicineScreen>
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final authViewModel = context.watch<AuthViewModel>();
-    return WillPopScope(
-      onWillPop: () async {
-        await _handleBackNavigation();
-        return false;
-      },
-      child: Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          toolbarHeight: 0,
-        ),
-        body: InteractiveParticleBackground(
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 28),
-                            onPressed: _handleBackNavigation,
-                          ),
-                          if (authViewModel.isPharmacy)
-                            IconButton(
-                              icon: const Icon(Icons.menu, color: Colors.white, size: 28),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const MenuBarScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          Expanded(
-                            child: Text(
-                              authViewModel.activePharmacyName ?? 'Medicines',
-                              style: const TextStyle(
-                                fontSize: 26,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
-                            onPressed: _initializeData,
-                          ),
-                          if (authViewModel.canActAsPharmacy) const NotificationIcon(),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      FadeTransition(
-                        opacity: _fadeAnimation,
-                        child: SlideTransition(
-                          position: _slideAnimation,
-                          // NEW: Modified search field to include new icons
-                          child: GlowingTextField(
-                            controller: _searchController,
-                            hintText: _isListening ? 'Listening...' : 'Search medicines...',
-                            onChanged: (value) {
-                              // NEW: Search only when not using image search
-                              if (_selectedImage == null) {
-                                _triggerSearch(value);
-                              }
-                            },
-                            // NEW: Prefix icon for image thumbnail
-                            prefixIcon: _selectedImage != null
-                                ? Padding(
-                              padding: const EdgeInsets.all(4.0),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: Image.file(
-                                  _selectedImage!,
-                                  height: 30,
-                                  width: 30,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            )
-                                : const Icon(Icons.search, color: Color(0xFF636AE8)),
-                            // NEW: Suffix icons for new features
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_selectedImage != null)
-                                  IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white70),
-                                    onPressed: _clearImageSearch,
-                                  ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.mic,
-                                    color: _isListening ? Colors.redAccent : Colors.white70,
-                                  ),
-                                  onPressed: _speechEnabled ? (_isListening ? _stopListening : _startListening) : null,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
-                                  onPressed: _pickImageAndRecognizeText,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Consumer<MedicineViewModel>(
-                  builder: (context, viewModel, child) {
-                    if (viewModel.isLoading) {
-                      return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF636AE8))));
-                    }
-                    if (viewModel.medicines.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.medication_outlined, size: 80, color: Colors.grey.shade600),
-                            const SizedBox(height: 20),
-                            Text('No medicines found', style: TextStyle(fontSize: 20, color: Colors.white.withOpacity(0.7))),
-                          ],
-                        ),
-                      );
-                    }
-                    final screenPadding = const EdgeInsets.all(20.0);
-                    final horizontalSpacing = 20.0;
-                    final verticalSpacing = 20.0;
-                    return RefreshIndicator(
-                      onRefresh: _initializeData,
-                      color: const Color(0xFF636AE8),
-                      backgroundColor: Colors.white.withOpacity(0.8),
-                      child: SingleChildScrollView(
-                        padding: screenPadding,
-                        child: Wrap(
-                          spacing: horizontalSpacing,
-                          runSpacing: verticalSpacing,
-                          alignment: WrapAlignment.start,
-                          children: viewModel.medicines.map((medicine) {
-                            final double screenWidth = MediaQuery.of(context).size.width;
-                            final double totalHorizontalPadding = screenPadding.left + screenPadding.right;
-                            final double totalSpacing = horizontalSpacing * 2;
-                            final double cardWidth = (screenWidth > 1200) ? (screenWidth - totalHorizontalPadding - totalSpacing) / 3 : (screenWidth > 800) ? (screenWidth - totalHorizontalPadding - horizontalSpacing) / 2 : (screenWidth - totalHorizontalPadding);
-                            return _buildMedicineCard(medicine, cardWidth);
-                          }).toList(),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: () async {
-            final pharmacyId = authViewModel.activePharmacyId;
-            if (pharmacyId == null) return;
-
-            final result = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AddMedicineScreen(pharmacyId: pharmacyId),
-              ),
-            );
-            if (result == true && mounted) {
-              _initializeData();
-            }
-          },
-          backgroundColor: const Color(0xFF636AE8),
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.add, color: Colors.white, size: 28),
-          label: const Text('Add Medicine', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          elevation: 8,
         ),
       ),
     );
@@ -562,7 +633,8 @@ class _MedicineScreenState extends State<MedicineScreen>
           decoration: BoxDecoration(
             color: const Color(0xFF0F0F1A),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-            border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
+            border:
+            Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
           ),
           child: Column(
             children: [
@@ -570,7 +642,8 @@ class _MedicineScreenState extends State<MedicineScreen>
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: const Color(0xFF636AE8).withOpacity(0.6),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                  borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(25)),
                 ),
                 child: Row(
                   children: [
@@ -580,7 +653,8 @@ class _MedicineScreenState extends State<MedicineScreen>
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(15),
                       ),
-                      child: const Icon(Icons.medication_outlined, color: Colors.white, size: 28),
+                      child: const Icon(Icons.medication_outlined,
+                          color: Colors.white, size: 28),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -594,7 +668,8 @@ class _MedicineScreenState extends State<MedicineScreen>
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                      icon:
+                      const Icon(Icons.close, color: Colors.white, size: 28),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -607,19 +682,40 @@ class _MedicineScreenState extends State<MedicineScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailCard(title: 'Category', value: medicine.category, icon: Icons.category),
+                      _buildDetailCard(
+                          title: 'Category',
+                          value: medicine.category,
+                          icon: Icons.category),
                       const SizedBox(height: 20),
-                      _buildDetailCard(title: 'Description', value: medicine.description, icon: Icons.description),
+                      _buildDetailCard(
+                          title: 'Description',
+                          value: medicine.description,
+                          icon: Icons.description),
                       const SizedBox(height: 20),
-                      _buildDetailCard(title: 'Price', value: '\$${medicine.price.toStringAsFixed(2)}', icon: Icons.attach_money),
+                      _buildDetailCard(
+                          title: 'Price',
+                          value: '\$${medicine.price.toStringAsFixed(2)}',
+                          icon: Icons.attach_money),
                       const SizedBox(height: 20),
-                      _buildDetailCard(title: 'Quantity', value: '${medicine.quantity} units', icon: Icons.inventory_2),
+                      _buildDetailCard(
+                          title: 'Quantity',
+                          value: '${medicine.quantity} units',
+                          icon: Icons.inventory_2),
                       const SizedBox(height: 20),
-                      _buildDetailCard(title: 'Expiry Date', value: medicine.expiryDate, icon: Icons.calendar_today),
+                      _buildDetailCard(
+                          title: 'Expiry Date',
+                          value: medicine.expiryDate,
+                          icon: Icons.calendar_today),
                       const SizedBox(height: 20),
-                      _buildDetailCard(title: 'Sell Price', value: '\$${medicine.priceSell.toStringAsFixed(2)}', icon: Icons.sell),
+                      _buildDetailCard(
+                          title: 'Sell Price',
+                          value: '\$${medicine.priceSell.toStringAsFixed(2)}',
+                          icon: Icons.sell),
                       const SizedBox(height: 20),
-                      _buildDetailCard(title: 'Quantity To Sell', value: '${medicine.quantityToSell ?? 'N/A'} units', icon: Icons.shopping_cart),
+                      _buildDetailCard(
+                          title: 'Quantity To Sell',
+                          value: '${medicine.quantityToSell ?? 'N/A'} units',
+                          icon: Icons.shopping_cart),
                       const SizedBox(height: 30),
                       _buildAdminActionButtons(medicine)
                     ],
@@ -633,7 +729,11 @@ class _MedicineScreenState extends State<MedicineScreen>
     );
   }
 
-  Widget _buildDetailCard({required String title, required String value, required IconData icon,}) {
+  Widget _buildDetailCard({
+    required String title,
+    required String value,
+    required IconData icon,
+  }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -663,9 +763,22 @@ class _MedicineScreenState extends State<MedicineScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: TextStyle(fontSize: 16, color: Colors.white.withOpacity(0.7),),),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white,),),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ),
@@ -700,7 +813,7 @@ class _MedicineScreenState extends State<MedicineScreen>
     Navigator.pop(context);
     final authViewModel = context.read<AuthViewModel>();
     final pharmacyId = authViewModel.activePharmacyId;
-    if(pharmacyId == null) return;
+    if (pharmacyId == null) return;
 
     final result = await Navigator.push<bool>(
       context,
@@ -726,16 +839,20 @@ class _MedicineScreenState extends State<MedicineScreen>
           borderRadius: BorderRadius.circular(15),
           side: BorderSide(color: const Color(0xFF636AE8).withOpacity(0.5)),
         ),
-        title: const Text('Confirm Delete', style: TextStyle(color: Colors.white)),
-        content: const Text('Are you sure you want to delete this medicine?', style: TextStyle(color: Colors.white70)),
+        title:
+        const Text('Confirm Delete', style: TextStyle(color: Colors.white)),
+        content: const Text('Are you sure you want to delete this medicine?',
+            style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+            child:
+            const Text('Cancel', style: TextStyle(color: Colors.white70)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+            child:
+            const Text('Delete', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -744,13 +861,12 @@ class _MedicineScreenState extends State<MedicineScreen>
     if (confirm == true && mounted) {
       final authViewModel = context.read<AuthViewModel>();
       final pharmacyId = authViewModel.activePharmacyId;
-      if(pharmacyId == null) return;
+      if (pharmacyId == null) return;
 
       try {
-        await context.read<MedicineViewModel>().deleteMedicine(
-            pharmacyId: pharmacyId,
-            medicineId: medicine.id
-        );
+        await context
+            .read<MedicineViewModel>()
+            .deleteMedicine(pharmacyId: pharmacyId, medicineId: medicine.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
