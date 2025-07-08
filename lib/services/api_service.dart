@@ -1000,4 +1000,34 @@ class ApiService {
 // =========================================================================
 // ==================== END: USER SETTINGS API METHODS =====================
 // =========================================================================
+
+
+  // =========================================================================
+  // ===================== START: DASHBOARD API METHOD =======================
+  // =========================================================================
+
+  /// Fetches dashboard statistics.
+  ///
+  /// If [pharmacyId] is provided, it fetches stats for that specific pharmacy.
+  /// This is intended for the owner role.
+  ///
+  /// If [pharmacyId] is null, it fetches:
+  /// - Global stats if the user is an owner.
+  /// - Stats for the logged-in pharmacy if the user is a pharmacy.
+  /// The backend should handle this logic based on the user's token.
+  Future<dynamic> getDashboardData({int? pharmacyId}) async {
+    String endpoint = 'account/dashboard/';
+
+    // If a specific pharmacyId is passed (by an owner), append it to the URL.
+    if (pharmacyId != null) {
+      endpoint = 'account/dashboard/$pharmacyId/';
+    }
+
+    print('Calling GET dashboard data endpoint: $endpoint');
+    return authenticatedGet(endpoint);
+  }
+
+// =========================================================================
+// ====================== END: DASHBOARD API METHOD ========================
+// =========================================================================
 }

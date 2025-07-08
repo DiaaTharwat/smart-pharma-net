@@ -4,17 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/view/Screens/available_pharmacy_screen.dart';
+import 'package:smart_pharma_net/view/Screens/dashboard_screen.dart';
 import 'package:smart_pharma_net/view/Screens/exchange_screen.dart';
 import 'package:smart_pharma_net/view/Screens/settings_screen.dart';
 import 'package:smart_pharma_net/view/Screens/welcome_screen.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
+import 'package:smart_pharma_net/viewmodels/dashboard_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
 import 'package:smart_pharma_net/view/Screens/pharmacy_orders_screen.dart';
 import 'package:smart_pharma_net/view/Screens/pricing_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'package:smart_pharma_net/view/Screens/home_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/notification_icon.dart';
-import 'package:smart_pharma_net/viewmodels/order_viewmodel.dart'; // -- ADDED --
+import 'package:smart_pharma_net/viewmodels/order_viewmodel.dart';
 
 class MenuBarScreen extends StatefulWidget {
   const MenuBarScreen({super.key});
@@ -62,6 +64,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
         context.read<PharmacyViewModel>().loadPharmacies(
             searchQuery: '', authViewModel: authViewModel);
       }
+      context.read<DashboardViewModel>().fetchDashboardStats();
     });
   }
 
@@ -150,6 +153,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
   Widget _buildPharmacySelector(BuildContext context) {
     final authVm = context.watch<AuthViewModel>();
     final pharmacyVm = context.watch<PharmacyViewModel>();
+    final dashboardVm = context.read<DashboardViewModel>();
 
     if (pharmacyVm.isLoading) {
       return const Center(child: LinearProgressIndicator(backgroundColor: Colors.transparent, color: Color(0xFF636AE8)));
@@ -165,7 +169,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: authVm.isImpersonating ? authVm.activePharmacyId : 'owner_mode',
+          value: authVm.isImpersonating ? authVm.activePharmacyId.toString() : 'owner_mode',
           isExpanded: true,
           dropdownColor: const Color(0xFF0D0D1A),
           icon: const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70),
@@ -177,25 +181,28 @@ class _MenuBarScreenState extends State<MenuBarScreen>
             ),
             ...pharmacyVm.pharmacies.map<DropdownMenuItem<String>>((PharmacyModel pharmacy) {
               return DropdownMenuItem<String>(
-                value: pharmacy.id,
+                value: pharmacy.id.toString(),
                 child: Text(pharmacy.name, style: const TextStyle(color: Colors.white)),
               );
             }).toList(),
           ],
-          // -- MODIFIED --: The logic to fetch notifications is added here.
           onChanged: (String? newValue) {
-            // Get the OrderViewModel instance to call its methods.
             final orderVm = context.read<OrderViewModel>();
 
             if (newValue == 'owner_mode') {
               authVm.stopImpersonation();
+              dashboardVm.selectPharmacy(null);
             } else if (newValue != null) {
-              final selectedPharmacy = pharmacyVm.pharmacies.firstWhere((p) => p.id == newValue, orElse: () => pharmacyVm.pharmacies.first);
+              final selectedPharmacy = pharmacyVm.pharmacies.firstWhere((p) => p.id.toString() == newValue);
               authVm.impersonatePharmacy(selectedPharmacy);
+
+              // =================== الجزء الذي تم تصحيحه ===================
+              // نقوم بتحويل النص (newValue) إلى رقم قبل إرساله
+              final pharmacyId = int.tryParse(newValue);
+              dashboardVm.selectPharmacy(pharmacyId);
+              // ==========================================================
             }
 
-            // -- ADDED --: Trigger notification and order loading immediately after
-            // the authentication state has changed.
             orderVm.loadImportantNotifications();
             orderVm.loadIncomingOrders();
           },
@@ -213,14 +220,10 @@ class _MenuBarScreenState extends State<MenuBarScreen>
 
     if (authViewModel.isImpersonating) {
       welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
-      accountTypeText = 'Owner';
+      accountTypeText = 'Owner (Impersonating)';
     } else if (authViewModel.isAdmin) {
       final email = authViewModel.ownerEmail;
-      if (email != null && email.isNotEmpty) {
-        welcomeText = 'Welcome, ${email[0].toUpperCase()}';
-      } else {
-        welcomeText = 'Welcome, Owner';
-      }
+      welcomeText = 'Welcome, ${(email != null && email.isNotEmpty) ? email.split('@')[0] : 'Owner'}';
       accountTypeText = 'Owner Account';
     } else if (authViewModel.isPharmacy) {
       welcomeText = 'Welcome, ${authViewModel.activePharmacyName ?? 'Pharmacy'}';
@@ -289,6 +292,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -320,6 +324,14 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       );
                     },
                   ),
+
+                  if (authViewModel.isAdmin || authViewModel.isPharmacy) ...[
+                    _buildMenuItem(
+                      icon: Icons.dashboard_rounded,
+                      title: 'Dashboard',
+                      onTap: () => _navigateTo(context, const DashboardScreen()),
+                    ),
+                  ],
 
                   if (authViewModel.isAdmin) ...[
                     _buildPharmacySelector(context),

@@ -3,10 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/repositories/auth_repository.dart';
+import 'package:smart_pharma_net/repositories/dashboard_repository.dart';
 import 'package:smart_pharma_net/repositories/medicine_repository.dart';
 import 'package:smart_pharma_net/repositories/pharmacy_repository.dart';
 import 'package:smart_pharma_net/services/api_service.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
+import 'package:smart_pharma_net/viewmodels/dashboard_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/medicine_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
 import 'package:smart_pharma_net/view/screens/welcome_screen.dart';
@@ -59,6 +61,9 @@ void main() async {
         ProxyProvider<ApiService, ChatAiRepository>(
           update: (_, apiService, __) => ChatAiRepository(apiService),
         ),
+        ProxyProvider<ApiService, DashboardRepository>(
+          update: (_, apiService, __) => DashboardRepository(apiService),
+        ),
         ChangeNotifierProxyProvider<ChatAiRepository, ChatAiViewModel>(
           create: (context) =>
               ChatAiViewModel(context.read<ChatAiRepository>()),
@@ -86,9 +91,6 @@ void main() async {
             context.read<PharmacyRepository>(),
           ),
         ),
-
-        // -- MODIFIED --: Changed to ChangeNotifierProxyProvider2 to pass both
-        // AuthViewModel and MedicineViewModel to ExchangeViewModel.
         ChangeNotifierProxyProvider2<AuthViewModel, MedicineViewModel, ExchangeViewModel>(
           create: (context) => ExchangeViewModel(
             context.read<ExchangeRepository>(),
@@ -101,7 +103,6 @@ void main() async {
             medicineViewModel,
           ),
         ),
-
         ChangeNotifierProxyProvider<AuthViewModel, OrderViewModel>(
           create: (context) => OrderViewModel(
             context.read<OrderRepository>(),
@@ -112,12 +113,10 @@ void main() async {
             authViewModel,
           ),
         ),
-
         ChangeNotifierProxyProvider<PurchaseRepository, PurchaseViewModel>(
           create: (context) => PurchaseViewModel(context.read<PurchaseRepository>()),
           update: (context, repo, previous) => previous ?? PurchaseViewModel(repo),
         ),
-
         ChangeNotifierProxyProvider<AuthViewModel, SubscriptionViewModel>(
           create: (context) => SubscriptionViewModel(
             context.read<SubscriptionRepository>(),
@@ -130,6 +129,12 @@ void main() async {
             authViewModel,
           ),
         ),
+        // =================== الجزء الذي تم تصحيحه ===================
+        ChangeNotifierProxyProvider<DashboardRepository, DashboardViewModel>(
+          create: (context) => DashboardViewModel(context.read<DashboardRepository>()),
+          update: (context, repo, previous) => previous ?? DashboardViewModel(repo),
+        ),
+        // ==========================================================
       ],
       child: const MyApp(),
     ),
