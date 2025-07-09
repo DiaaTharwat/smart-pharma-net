@@ -1,14 +1,13 @@
-// lib/view/Widgets/common_ui_elements.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:simple_animations/simple_animations.dart';
 
-// ========== بداية التعديل: تم تحديث GlowingTextField لقبول ويدجت للأيقونات ==========
+// ========== GlowingTextField (بدون تغيير) ==========
 class GlowingTextField extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
-  final Widget? prefixIcon; // تم التغيير من IconData إلى Widget
-  final Widget? suffixIcon; // تم إضافة SuffixIcon
+  final Widget? prefixIcon;
+  final Widget? suffixIcon;
   final bool isPassword;
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
@@ -22,7 +21,7 @@ class GlowingTextField extends StatefulWidget {
     super.key,
     required this.controller,
     required this.hintText,
-    this.prefixIcon, // قيمة اختيارية الآن
+    this.prefixIcon,
     this.suffixIcon,
     this.isPassword = false,
     this.validator,
@@ -64,7 +63,7 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
-      cursor: SystemMouseCursors.text, // تم التغيير ليعكس أنه حقل نصي
+      cursor: SystemMouseCursors.text,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         decoration: BoxDecoration(
@@ -119,7 +118,7 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
                 });
               },
             )
-                : widget.suffixIcon, // استخدام suffixIcon الجديد هنا
+                : widget.suffixIcon,
             border: InputBorder.none,
             contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -129,16 +128,15 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
     );
   }
 }
-// ========== نهاية التعديل ==========
 
-
-// Custom Pulsing Action Button (unchanged from previous version)
+// ========== PulsingActionButton (هنا التعديل المهم) ==========
 class PulsingActionButton extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
   final Color? buttonColor;
   final Color? shadowBaseColor;
   final IconData? leadingIcon;
+  final bool isEnabled; // الخاصية المطلوبة موجودة هنا
 
   const PulsingActionButton({
     super.key,
@@ -147,13 +145,15 @@ class PulsingActionButton extends StatefulWidget {
     this.buttonColor,
     this.shadowBaseColor,
     this.leadingIcon,
+    this.isEnabled = true, // وهنا قيمتها الافتراضية
   });
 
   @override
   State<PulsingActionButton> createState() => _PulsingActionButtonState();
 }
 
-class _PulsingActionButtonState extends State<PulsingActionButton> with TickerProviderStateMixin {
+class _PulsingActionButtonState extends State<PulsingActionButton>
+    with TickerProviderStateMixin {
   late AnimationController _pulseController;
   late AnimationController _scaleController;
   late Animation<double> _scaleAnimation;
@@ -161,9 +161,30 @@ class _PulsingActionButtonState extends State<PulsingActionButton> with TickerPr
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
-    _scaleController = AnimationController(vsync: this, duration: const Duration(milliseconds: 100), value: 1.0, lowerBound: 0.95, upperBound: 1.0);
-    _scaleAnimation = CurvedAnimation(parent: _scaleController, curve: Curves.easeOut);
+    _pulseController =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2));
+    _scaleController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 100),
+        value: 1.0,
+        lowerBound: 0.95,
+        upperBound: 1.0);
+    _scaleAnimation =
+        CurvedAnimation(parent: _scaleController, curve: Curves.easeOut);
+
+    if (widget.isEnabled) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PulsingActionButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isEnabled && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!widget.isEnabled && _pulseController.isAnimating) {
+      _pulseController.stop();
+    }
   }
 
   @override
@@ -174,15 +195,18 @@ class _PulsingActionButtonState extends State<PulsingActionButton> with TickerPr
   }
 
   void _onTapDown(TapDownDetails details) {
+    if (!widget.isEnabled) return;
     _scaleController.reverse();
   }
 
   void _onTapUp(TapUpDetails details) {
+    if (!widget.isEnabled) return;
     _scaleController.forward();
     widget.onTap();
   }
 
   void _onTapCancel() {
+    if (!widget.isEnabled) return;
     _scaleController.forward();
   }
 
@@ -191,11 +215,18 @@ class _PulsingActionButtonState extends State<PulsingActionButton> with TickerPr
     final Color defaultButtonColor = const Color(0xFF636AE8);
     final Color defaultShadowBaseColor = const Color(0xFF636AE8);
 
-    final Color actualButtonColor = widget.buttonColor ?? defaultButtonColor;
-    final Color actualShadowBaseColor = widget.shadowBaseColor ?? defaultShadowBaseColor;
+    final Color actualButtonColor = widget.isEnabled
+        ? (widget.buttonColor ?? defaultButtonColor)
+        : Colors.grey.shade700;
+    final Color actualShadowBaseColor =
+        widget.shadowBaseColor ?? defaultShadowBaseColor;
+    final Color textColor =
+    widget.isEnabled ? Colors.white : Colors.grey.shade400;
 
     return MouseRegion(
-      cursor: SystemMouseCursors.click,
+      cursor: widget.isEnabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.forbidden,
       child: GestureDetector(
         onTapDown: _onTapDown,
         onTapUp: _onTapUp,
@@ -205,8 +236,9 @@ class _PulsingActionButtonState extends State<PulsingActionButton> with TickerPr
           child: AnimatedBuilder(
             animation: _pulseController,
             builder: (context, child) {
-              final glow = _pulseController.value * 0.2;
-              return Container(
+              final glow = widget.isEnabled ? _pulseController.value * 0.2 : 0.0;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 decoration: BoxDecoration(
@@ -221,18 +253,17 @@ class _PulsingActionButtonState extends State<PulsingActionButton> with TickerPr
                   ],
                 ),
                 child: Center(
-                  // Use a Row to place icon and text
                   child: Row(
-                    mainAxisSize: MainAxisSize.min, // Make row shrink to content
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (widget.leadingIcon != null) ...[ // If icon is provided
-                        Icon(widget.leadingIcon, color: Colors.white, size: 24), // Icon color white
-                        const SizedBox(width: 8), // Space between icon and text
+                      if (widget.leadingIcon != null) ...[
+                        Icon(widget.leadingIcon, color: textColor, size: 24),
+                        const SizedBox(width: 8),
                       ],
                       Text(
                         widget.label,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: textColor,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.2,
@@ -250,16 +281,18 @@ class _PulsingActionButtonState extends State<PulsingActionButton> with TickerPr
   }
 }
 
-// The Interactive Particle Background (unchanged from previous version)
+// ========== InteractiveParticleBackground (بدون تغيير) ==========
 class InteractiveParticleBackground extends StatefulWidget {
   final Widget child;
   const InteractiveParticleBackground({super.key, required this.child});
 
   @override
-  State<InteractiveParticleBackground> createState() => _InteractiveParticleBackgroundState();
+  State<InteractiveParticleBackground> createState() =>
+      _InteractiveParticleBackgroundState();
 }
 
-class _InteractiveParticleBackgroundState extends State<InteractiveParticleBackground> {
+class _InteractiveParticleBackgroundState
+    extends State<InteractiveParticleBackground> {
   final List<Particle> particles = [];
   Offset? touchPoint;
 
@@ -279,8 +312,10 @@ class _InteractiveParticleBackgroundState extends State<InteractiveParticleBackg
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onPanStart: (details) => setState(() => touchPoint = details.localPosition),
-      onPanUpdate: (details) => setState(() => touchPoint = details.localPosition),
+      onPanStart: (details) =>
+          setState(() => touchPoint = details.localPosition),
+      onPanUpdate: (details) =>
+          setState(() => touchPoint = details.localPosition),
       onPanEnd: (_) => setState(() => touchPoint = null),
       child: Container(
         decoration: const BoxDecoration(
@@ -291,7 +326,8 @@ class _InteractiveParticleBackgroundState extends State<InteractiveParticleBackg
           ),
         ),
         child: CustomPaint(
-          painter: ParticlePainter(particles: particles, touchPoint: touchPoint),
+          painter:
+          ParticlePainter(particles: particles, touchPoint: touchPoint),
           child: widget.child,
         ),
       ),
@@ -313,11 +349,15 @@ class ParticlePainter extends CustomPainter {
     final particlePaint = Paint();
     for (int i = 0; i < particles.length; i++) {
       for (int j = i + 1; j < particles.length; j++) {
-        if (particles[i].position.dx.isFinite && particles[i].position.dy.isFinite &&
-            particles[j].position.dx.isFinite && particles[j].position.dy.isFinite) {
-          final distance = (particles[i].position - particles[j].position).distance;
+        if (particles[i].position.dx.isFinite &&
+            particles[i].position.dy.isFinite &&
+            particles[j].position.dx.isFinite &&
+            particles[j].position.dy.isFinite) {
+          final distance =
+              (particles[i].position - particles[j].position).distance;
           if (distance < 120) {
-            canvas.drawLine(particles[i].position, particles[j].position, linePaint);
+            canvas.drawLine(
+                particles[i].position, particles[j].position, linePaint);
           }
         }
       }
@@ -342,17 +382,20 @@ class Particle {
   final Random _random = Random();
 
   Particle(Size bounds) {
-    position = Offset(_random.nextDouble() * bounds.width, _random.nextDouble() * bounds.height);
+    position = Offset(
+        _random.nextDouble() * bounds.width, _random.nextDouble() * bounds.height);
     color = const Color(0xFF636AE8).withOpacity(_random.nextDouble() * 0.5 + 0.2);
     radius = _random.nextDouble() * 2 + 1;
-    velocity = Offset(_random.nextDouble() * 1.0 - 0.5, _random.nextDouble() * 1.0 - 0.5);
+    velocity =
+        Offset(_random.nextDouble() * 1.0 - 0.5, _random.nextDouble() * 1.0 - 0.5);
   }
 
   void update(Size bounds, Offset? touchPoint) {
     if (touchPoint != null) {
       final distance = (position - touchPoint).distance;
       if (distance < 200) {
-        final direction = (position - touchPoint).scale(1 / (distance + 0.1), 1 / (distance + 0.1));
+        final direction =
+        (position - touchPoint).scale(1 / (distance + 0.1), 1 / (distance + 0.1));
         velocity = (velocity + direction * 0.1).scale(0.99, 0.99);
       }
     }

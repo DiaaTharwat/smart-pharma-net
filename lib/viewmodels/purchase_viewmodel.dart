@@ -1,6 +1,6 @@
-// lib/viewmodels/purchase_viewmodel.dart
-
 import 'package:flutter/material.dart';
+// --- تم التعديل هنا ---
+// تم استيراد الموديل بالاسم الجديد والصحيح
 import 'package:smart_pharma_net/models/user_purchase_model.dart';
 import 'package:smart_pharma_net/repositories/purchase_repository.dart';
 import 'package:smart_pharma_net/viewmodels/base_viewmodel.dart';
@@ -10,7 +10,9 @@ class PurchaseViewModel extends BaseViewModel {
 
   PurchaseViewModel(this._purchaseRepository);
 
-  Future<bool> submitPurchase(UserPurchaseModel purchaseData) async {
+  // --- تم التعديل هنا ---
+  // تم تحديث نوع البيانات المستقبلة إلى الاسم الجديد
+  Future<bool> submitPurchase(UserPurchase purchaseData) async {
     setLoading(true);
     setError(null);
     try {
