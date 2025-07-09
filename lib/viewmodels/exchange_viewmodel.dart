@@ -63,16 +63,19 @@ class ExchangeViewModel extends BaseViewModel {
     notifyListeners();
   }
 
+  // -- ✨ تم التصحيح النهائي والكامل ✨ --
   Future<void> createBuyOrder({
     required String medicineId,
     required String medicineName,
     required String price,
     required int quantity,
     required String pharmacySeller,
+    required String recieveDate, // حقل التاريخ الجديد
   }) async {
     setError(null);
 
     try {
+      // ✨ رجعنا نجيب الـ ID والاسم زي الأول
       final pharmacyBuyerId = await _authViewModel.getPharmacyId();
       final pharmacyBuyerName = await _authViewModel.getPharmacyName();
 
@@ -89,8 +92,6 @@ class ExchangeViewModel extends BaseViewModel {
 
         if (newQuantity <= 0) {
           _originalExchangeMedicines.removeAt(index);
-
-          // -- MODIFIED --: Using the new, more reliable removal method.
           _medicineViewModel.removeMedicineByNameAndPharmacy(
             name: currentMedicine.medicineName,
             pharmacyId: currentMedicine.pharmacyId,
@@ -103,13 +104,15 @@ class ExchangeViewModel extends BaseViewModel {
         applySearchFilter(_searchQuery);
       }
 
+      // ✨ تم تحديث الاستدعاء عشان يبعت الـ ID تاني
       await _exchangeRepository.createBuyOrder(
         medicineName: medicineName,
         price: price,
         quantity: quantity,
         pharmacySeller: pharmacySeller,
         pharmacyBuyer: pharmacyBuyerName,
-        pharmacyBuyerId: pharmacyBuyerId,
+        pharmacyBuyerId: pharmacyBuyerId, // ✨ بنبعت الـ ID هنا
+        recieveDate: recieveDate,
       );
 
       _exchangeOrderPlacedSuccessfully = true;

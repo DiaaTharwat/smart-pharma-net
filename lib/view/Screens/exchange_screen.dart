@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // ✨ تم إضافة هذه المكتبة لتهيئة شكل التاريخ
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
@@ -568,14 +569,14 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     );
   }
 
-  void _showMapDialog(
-      String pharmacyName, String lat, String lon) {
+  void _showMapDialog(String pharmacyName, String lat, String lon) {
     final double? latitude = double.tryParse(lat);
     final double? longitude = double.tryParse(lon);
 
     if (latitude == null || longitude == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid location data for this pharmacy.")),
+        const SnackBar(
+            content: Text("Invalid location data for this pharmacy.")),
       );
       return;
     }
@@ -590,7 +591,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         ),
         title: Text(
           pharmacyName,
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style:
+          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -624,7 +626,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
         ),
         actions: [
           TextButton(
-            child: const Text('Close', style: TextStyle(color: Color(0xFF636AE8))),
+            child:
+            const Text('Close', style: TextStyle(color: Color(0xFF636AE8))),
             onPressed: () {
               Navigator.of(context).pop();
             },
@@ -667,8 +670,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
-        border:
-        Border.all(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
+        border: Border.all(
+            color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
         boxShadow: [
           BoxShadow(
               color: const Color(0xFF636AE8).withOpacity(0.15),
@@ -690,14 +693,14 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                 children: [
                   Container(
                     height: 140,
-                    decoration:
-                    BoxDecoration(color: const Color(0xFF636AE8).withOpacity(0.2)),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF636AE8).withOpacity(0.2)),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         ClipRRect(
-                          borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(20)),
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20)),
                           child: imageWidget,
                         ),
                         Positioned(
@@ -750,19 +753,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             )
                           ],
                         ),
-                        // -- REMOVED --: The following SizedBox and Row displaying the expiry date have been removed.
-                        // const SizedBox(height: 4),
-                        // Row(
-                        //   children: [
-                        //     Icon(Icons.calendar_today_outlined,
-                        //         size: 11, color: Colors.white.withOpacity(0.7)),
-                        //     const SizedBox(width: 4),
-                        //     Text('Exp: ${medicine.medicineExpiryDate}',
-                        //         style: TextStyle(
-                        //             fontSize: 11,
-                        //             color: Colors.white.withOpacity(0.7))),
-                        //   ],
-                        // ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -808,8 +798,11 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     );
   }
 
+  // -- ✨ تم التحديث الكامل لهذه الدالة لإضافة حقل اختيار التاريخ ✨ --
   void _showBuyMedicineModal(ExchangeMedicineModel medicine) {
     int quantityToBuy = 1;
+    DateTime? selectedDate; // ✨ متغير لتخزين التاريخ الذي تم اختياره
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -817,6 +810,39 @@ class _ExchangeScreenState extends State<ExchangeScreen>
       builder: (modalContext) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
+            // ✨ دالة لفتح واجهة اختيار التاريخ
+            Future<void> selectDate(BuildContext context) async {
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: DateTime.now(),
+                firstDate: DateTime.now(), // لا يمكن اختيار تاريخ في الماضي
+                lastDate: DateTime(2101),
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: const ColorScheme.dark(
+                        primary: Color(0xFF636AE8), // لون العنوان
+                        onPrimary: Colors.white, // لون النص في العنوان
+                        onSurface: Colors.white, // لون أرقام الأيام
+                      ),
+                      textButtonTheme: TextButtonThemeData(
+                        style: TextButton.styleFrom(
+                          foregroundColor:
+                          const Color(0xFF636AE8), // لون أزرار OK/Cancel
+                        ),
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+              if (picked != null && picked != selectedDate) {
+                setModalState(() {
+                  selectedDate = picked;
+                });
+              }
+            }
+
             return Container(
               padding: EdgeInsets.fromLTRB(
                   24, 24, 24, MediaQuery.of(context).viewInsets.bottom + 24),
@@ -824,136 +850,152 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                 color: const Color(0xFF0F0F1A),
                 borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(25)),
-                border:
-                Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
+                border: Border.all(
+                    color: const Color(0xFF636AE8).withOpacity(0.3)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[700],
-                      borderRadius: BorderRadius.circular(2),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'Confirm Exchange',
-                    style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
-                  ),
-                  const SizedBox(height: 24),
-                  ListTile(
-                    leading: const Icon(Icons.medication_outlined,
-                        color: Color(0xFF636AE8), size: 30),
-                    title: Text(medicine.medicineName,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontSize: 18)),
-                    subtitle: Text('From: ${medicine.pharmacyName}',
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 16)),
-                    trailing: Text(
-                        '\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}',
-                        style: const TextStyle(
-                            color: Color(0xFF4CAF50),
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline,
-                            color: Color(0xFF636AE8), size: 30),
-                        onPressed: () {
-                          if (quantityToBuy > 1) {
-                            setModalState(() {
-                              quantityToBuy--;
-                            });
-                          }
-                        },
-                      ),
-                      Text(quantityToBuy.toString(),
+                    const Text(
+                      'Confirm Exchange',
+                      style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white),
+                    ),
+                    const SizedBox(height: 24),
+                    ListTile(
+                      leading: const Icon(Icons.medication_outlined,
+                          color: Color(0xFF636AE8), size: 30),
+                      title: Text(medicine.medicineName,
                           style: const TextStyle(
-                              fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white)),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline,
-                            color: Color(0xFF636AE8), size: 30),
-                        onPressed: () {
-                          if (quantityToBuy <
-                              int.parse(medicine.medicineQuantityToSell)) {
-                            setModalState(() {
-                              quantityToBuy++;
-                            });
-                          } else {
-                            _scaffoldMessengerKey.currentState?.showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Cannot buy more than available quantity.'),
-                                backgroundColor: Colors.orangeAccent,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.all(Radius.circular(10))),
-                              ),
-                            );
-                          }
-                        },
+                              color: Colors.white,
+                              fontSize: 18)),
+                      subtitle: Text('From: ${medicine.pharmacyName}',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 16)),
+                      trailing: Text(
+                          '\$${double.parse(medicine.medicinePriceToSell).toStringAsFixed(2)}',
+                          style: const TextStyle(
+                              color: Color(0xFF4CAF50),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.remove_circle_outline,
+                              color: Color(0xFF636AE8), size: 30),
+                          onPressed: () {
+                            if (quantityToBuy > 1) {
+                              setModalState(() {
+                                quantityToBuy--;
+                              });
+                            }
+                          },
+                        ),
+                        Text(quantityToBuy.toString(),
+                            style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline,
+                              color: Color(0xFF636AE8), size: 30),
+                          onPressed: () {
+                            if (quantityToBuy <
+                                int.parse(medicine.medicineQuantityToSell)) {
+                              setModalState(() {
+                                quantityToBuy++;
+                              });
+                            } else {
+                              _scaffoldMessengerKey.currentState?.showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Cannot buy more than available quantity.'),
+                                  backgroundColor: Colors.orangeAccent,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                      BorderRadius.all(Radius.circular(10))),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    // ✨ هذا هو الزر الجديد لاختيار التاريخ
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.calendar_today, size: 18),
+                      label: Text(
+                        selectedDate == null
+                            ? 'Select Expected Receive Date'
+                            : 'Receive Date: ${DateFormat('yyyy-MM-dd').format(selectedDate!)}',
+                        style: const TextStyle(fontSize: 14),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Total: \$${(quantityToBuy * double.parse(medicine.medicinePriceToSell)).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4CAF50)),
-                  ),
-                  const SizedBox(height: 24),
-                  PulsingActionButton(
-                    label: 'Confirm Order',
-                    onTap: () async {
-                      Navigator.pop(modalContext);
+                      onPressed: () => selectDate(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                            color: const Color(0xFF636AE8).withOpacity(0.7)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Total: \$${(quantityToBuy * double.parse(medicine.medicinePriceToSell)).toStringAsFixed(2)}',
+                      style: const TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF4CAF50)),
+                    ),
+                    const SizedBox(height: 24),
+                    PulsingActionButton(
+                      label: 'Confirm Order',
+                      onTap: () async {
+                        // ✨ فحص للتأكد من أن المستخدم اختار تاريخًا
+                        if (selectedDate == null) {
+                          _scaffoldMessengerKey.currentState?.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Please select an expected receive date.'),
+                              backgroundColor: Colors.orangeAccent,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                  BorderRadius.all(Radius.circular(10))),
+                            ),
+                          );
+                          return; // إيقاف التنفيذ إذا لم يتم اختيار تاريخ
+                        }
 
-                      if (mounted) {
-                        _scaffoldMessengerKey.currentState?.showSnackBar(
-                          const SnackBar(
-                            content: Text('Sending order...'),
-                            backgroundColor: Colors.blueAccent,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                                borderRadius:
-                                BorderRadius.all(Radius.circular(10))),
-                          ),
-                        );
-                      }
+                        Navigator.pop(modalContext);
 
-                      try {
-                        await this.context.read<ExchangeViewModel>().createBuyOrder(
-                          medicineId: medicine.id,
-                          medicineName: medicine.medicineName,
-                          price: medicine.medicinePriceToSell,
-                          quantity: quantityToBuy,
-                          pharmacySeller: medicine.pharmacyName,
-                        );
-                      } catch (e) {
                         if (mounted) {
                           _scaffoldMessengerKey.currentState?.showSnackBar(
-                            SnackBar(
-                              content:
-                              Text('Failed to place order: ${e.toString()}'),
-                              backgroundColor: Colors.red,
+                            const SnackBar(
+                              content: Text('Sending order...'),
+                              backgroundColor: Colors.blueAccent,
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
                                   borderRadius:
@@ -961,18 +1003,48 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             ),
                           );
                         }
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => Navigator.pop(modalContext),
-                    child: Text('Cancel',
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 16)),
-                  ),
-                ],
+
+                        try {
+                          // ✨ تم تحديث الاستدعاء لإرسال التاريخ
+                          await this
+                              .context
+                              .read<ExchangeViewModel>()
+                              .createBuyOrder(
+                            medicineId: medicine.id,
+                            medicineName: medicine.medicineName,
+                            price: medicine.medicinePriceToSell,
+                            quantity: quantityToBuy,
+                            pharmacySeller: medicine.pharmacyName,
+                            // ✨ إرسال التاريخ بعد تحويله لنص متوافق مع API
+                            recieveDate: selectedDate!.toIso8601String(),
+                          );
+                        } catch (e) {
+                          if (mounted) {
+                            _scaffoldMessengerKey.currentState?.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    'Failed to place order: ${e.toString()}'),
+                                backgroundColor: Colors.red,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                    BorderRadius.all(Radius.circular(10))),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => Navigator.pop(modalContext),
+                      child: Text('Cancel',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 16)),
+                    ),
+                  ],
+                ),
               ),
             );
           },

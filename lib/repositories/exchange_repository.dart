@@ -24,15 +24,15 @@ class ExchangeRepository {
   }
 
   // Sends a buy order for a medicine to another pharmacy
-  // -- تعديل --
-  // تم إضافة `pharmacyBuyerId` المطلوب لإرساله في الرابط الجديد
+  // -- ✨ تم التصحيح النهائي والكامل ✨ --
   Future<Map<String, dynamic>> createBuyOrder({
     required String medicineName,
-    required String price, // This should be medicine_price_to_sell
+    required String price,
     required int quantity,
-    required String pharmacySeller,
-    required String pharmacyBuyer, // This is the name of the pharmacy making the order
-    required String pharmacyBuyerId, // This is the ID of the pharmacy making the order
+    required String pharmacySeller, // Name of the selling pharmacy
+    required String pharmacyBuyer,  // Name of the buying pharmacy
+    required String pharmacyBuyerId, // ✨ رجعنا نستخدم الـ ID تاني
+    required String recieveDate,    // The new date field
   }) async {
     try {
       print('Creating buy order for pharmacy ID: $pharmacyBuyerId...');
@@ -41,21 +41,20 @@ class ExchangeRepository {
         'price': price,
         'quantity': quantity,
         'pharmacy_seller': pharmacySeller,
-        'pharmacy_buyer': pharmacyBuyer, // مازال مطلوبًا في جسم الطلب
-        'status': 'Pending', // Initial status
+        'pharmacy_buyer': pharmacyBuyer,
+        'recieve_date': recieveDate,
+        'status': 'Pending',
       };
       print('Payload: $payload');
 
-      // -- تعديل --
-      // تم استبدال `_apiService.post` بالدالة الجديدة `postForPharmacy`
-      // لكي يتم بناء المسار الصحيح الذي يتضمن `pharmacy_id`
+      // ✨ تم استخدام الدالة الصحيحة 'postForPharmacy' اللي بتبعت الـ ID في الرابط
       final response = await _apiService.postForPharmacy(
-        'exchange/buy/order/',
+        'exchange/buy/order/', // ده الجزء الأول من الرابط
         payload,
-        pharmacyId: pharmacyBuyerId,
+        pharmacyId: pharmacyBuyerId, // ودي الدالة بتضيفها للرابط
       );
 
-      return response; // Assuming API returns confirmation or order details
+      return response;
     } catch (e) {
       print('Error creating buy order: $e');
       rethrow;

@@ -1,5 +1,6 @@
 // lib/viewmodels/order_viewmodel.dart
 
+import 'dart:async'; // ✨ تم إضافة هذا السطر
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_pharma_net/models/order_model.dart';
@@ -17,10 +18,16 @@ class OrderViewModel extends BaseViewModel {
   int _unreadNotificationCount = 0;
   String? _lastReadNotificationTimestamp;
 
+  // ✨ متغير جديد لتتبع حالة الـ ViewModel
+  bool _isDisposed = false;
+  Timer? _notificationTimer; // ✨ متغير جديد لعمل مؤقت زمني
+
   static const String _lastReadTimestampKey = 'lastReadNotificationTimestamp';
 
   OrderViewModel(this._orderRepository, this._authViewModel) {
     _loadLastReadTimestamp();
+    // ✨ ابدأ التحديث الدوري للإشعارات عند إنشاء الـ ViewModel
+    _startPollingForNotifications();
   }
 
   List<OrderModel> get incomingOrders => _incomingOrders;
@@ -31,19 +38,44 @@ class OrderViewModel extends BaseViewModel {
       _incomingOrders.where((order) => order.status == 'Pending').length;
   int get importantNotificationsCount => _unreadNotificationCount;
 
+  // ✨ تم إضافة دالة لإيقاف التحديث الدوري
+  void _startPollingForNotifications() {
+    // قم باستدعاء الدالة كل 30 ثانية للتحقق من وجود إشعارات جديدة
+    _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      print("Polling for new notifications...");
+      if (!_isDisposed) {
+        loadImportantNotifications();
+      } else {
+        timer.cancel(); // أوقف المؤقت إذا تم التخلص من الـ ViewModel
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true; // ✨ علم بأنه تم التخلص من الـ ViewModel
+    _notificationTimer?.cancel(); // ✨ تأكد من إيقاف المؤقت
+    super.dispose();
+  }
+
+
   Future<void> _loadLastReadTimestamp() async {
     final prefs = await SharedPreferences.getInstance();
     _lastReadNotificationTimestamp = prefs.getString(_lastReadTimestampKey);
   }
 
   Future<void> loadIncomingOrders() async {
+    // ✨ فحص قبل بدء العملية
+    if (_isDisposed) return;
     setLoading(true);
     setError(null);
+
     try {
       final pharmacyId = await _authViewModel.getPharmacyId();
       if (pharmacyId == null) {
         _incomingOrders = [];
-        setLoading(false);
+        // ✨ فحص بعد انتهاء العملية
+        if (!_isDisposed) setLoading(false);
         return;
       }
 
@@ -55,13 +87,15 @@ class OrderViewModel extends BaseViewModel {
         return (b.createdAt ?? '').compareTo(a.createdAt ?? '');
       });
     } catch (e) {
-      setError(e.toString());
+      if (!_isDisposed) setError(e.toString());
     } finally {
-      setLoading(false);
+      if (!_isDisposed) setLoading(false);
     }
   }
 
   Future<void> loadImportantNotifications() async {
+    // ✨ فحص قبل بدء العملية
+    if (_isDisposed) return;
     setLoading(true);
     setError(null);
     try {
@@ -69,14 +103,18 @@ class OrderViewModel extends BaseViewModel {
       if (pharmacyId == null) {
         _importantNotifications = [];
         _unreadNotificationCount = 0;
-        setLoading(false);
+        if (!_isDisposed) setLoading(false);
         return;
       }
 
-      _importantNotifications = await _orderRepository.getImportantNotifications(pharmacyId: pharmacyId);
+      final newNotifications = await _orderRepository.getImportantNotifications(pharmacyId: pharmacyId);
 
-      _importantNotifications
-          .sort((a, b) => (b.createdAt).compareTo(a.createdAt));
+      // ✨ تحقق إذا كانت الإشعارات الجديدة مختلفة عن القديمة قبل التحديث
+      if (newNotifications.length != _importantNotifications.length ||
+          !newNotifications.every((item) => _importantNotifications.contains(item))) {
+        _importantNotifications = newNotifications;
+        _importantNotifications.sort((a, b) => (b.createdAt).compareTo(a.createdAt));
+      }
 
       if (_lastReadNotificationTimestamp != null) {
         try {
@@ -96,11 +134,12 @@ class OrderViewModel extends BaseViewModel {
         _unreadNotificationCount = _importantNotifications.length;
       }
     } catch (e) {
-      setError(e.toString());
+      if (!_isDisposed) setError(e.toString());
     } finally {
-      setLoading(false);
+      if (!_isDisposed) setLoading(false);
     }
   }
+
 
   Future<void> markNotificationsAsRead() async {
     if (_importantNotifications.isNotEmpty) {
@@ -110,7 +149,7 @@ class OrderViewModel extends BaseViewModel {
           _lastReadTimestampKey, _lastReadNotificationTimestamp!);
     }
     _unreadNotificationCount = 0;
-    notifyListeners();
+    if (!_isDisposed) notifyListeners();
   }
 
   Future<bool> updateOrderStatus(String orderId, String newStatus) async {
@@ -130,13 +169,19 @@ class OrderViewModel extends BaseViewModel {
         if (a.status != 'Pending' && b.status == 'Pending') return 1;
         return (b.createdAt ?? '').compareTo(a.createdAt ?? '');
       });
-      notifyListeners();
+
+      // ✨ بعد تحديث الحالة بنجاح، اطلب تحديث الإشعارات
+      await loadImportantNotifications();
+
+      if (!_isDisposed) notifyListeners();
       return true;
 
     } catch (e) {
       _incomingOrders[orderIndex] = originalOrder;
-      setError("Failed to update status: ${e.toString()}");
-      notifyListeners();
+      if (!_isDisposed) {
+        setError("Failed to update status: ${e.toString()}");
+        notifyListeners();
+      }
       return false;
     }
   }
