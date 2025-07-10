@@ -1,8 +1,10 @@
+// lib/view/Widgets/common_ui_elements.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // تأكد من وجود هذا السطر
 import 'package:simple_animations/simple_animations.dart';
 
-// ========== GlowingTextField (بدون تغيير) ==========
+// ========== GlowingTextField (هنا التعديل) ==========
 class GlowingTextField extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
@@ -16,6 +18,8 @@ class GlowingTextField extends StatefulWidget {
   final int? maxLines;
   final bool readOnly;
   final VoidCallback? onTap;
+  // ✨ تم إضافة هذه الخاصية الجديدة
+  final List<TextInputFormatter>? inputFormatters;
 
   const GlowingTextField({
     super.key,
@@ -31,6 +35,8 @@ class GlowingTextField extends StatefulWidget {
     this.maxLines,
     this.readOnly = false,
     this.onTap,
+    // ✨ تم إضافة هذه الخاصية الجديدة
+    this.inputFormatters,
   });
 
   @override
@@ -83,6 +89,8 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
           enabled: widget.enabled,
           focusNode: _focusNode,
           controller: widget.controller,
+          // ✨ تم تمرير الخاصية الجديدة هنا
+          inputFormatters: widget.inputFormatters,
           keyboardType: widget.keyboardType,
           obscureText: widget.isPassword ? _isObscured : false,
           style: const TextStyle(color: Colors.white),
@@ -129,14 +137,14 @@ class _GlowingTextFieldState extends State<GlowingTextField> {
   }
 }
 
-// ========== PulsingActionButton (هنا التعديل المهم) ==========
+// ========== PulsingActionButton (بدون تغيير) ==========
 class PulsingActionButton extends StatefulWidget {
   final String label;
   final VoidCallback onTap;
   final Color? buttonColor;
   final Color? shadowBaseColor;
   final IconData? leadingIcon;
-  final bool isEnabled; // الخاصية المطلوبة موجودة هنا
+  final bool isEnabled;
 
   const PulsingActionButton({
     super.key,
@@ -145,7 +153,7 @@ class PulsingActionButton extends StatefulWidget {
     this.buttonColor,
     this.shadowBaseColor,
     this.leadingIcon,
-    this.isEnabled = true, // وهنا قيمتها الافتراضية
+    this.isEnabled = true,
   });
 
   @override
@@ -382,20 +390,20 @@ class Particle {
   final Random _random = Random();
 
   Particle(Size bounds) {
-    position = Offset(
-        _random.nextDouble() * bounds.width, _random.nextDouble() * bounds.height);
+    position = Offset(_random.nextDouble() * bounds.width,
+        _random.nextDouble() * bounds.height);
     color = const Color(0xFF636AE8).withOpacity(_random.nextDouble() * 0.5 + 0.2);
     radius = _random.nextDouble() * 2 + 1;
-    velocity =
-        Offset(_random.nextDouble() * 1.0 - 0.5, _random.nextDouble() * 1.0 - 0.5);
+    velocity = Offset(
+        _random.nextDouble() * 1.0 - 0.5, _random.nextDouble() * 1.0 - 0.5);
   }
 
   void update(Size bounds, Offset? touchPoint) {
     if (touchPoint != null) {
       final distance = (position - touchPoint).distance;
       if (distance < 200) {
-        final direction =
-        (position - touchPoint).scale(1 / (distance + 0.1), 1 / (distance + 0.1));
+        final direction = (position - touchPoint)
+            .scale(1 / (distance + 0.1), 1 / (distance + 0.1));
         velocity = (velocity + direction * 0.1).scale(0.99, 0.99);
       }
     }

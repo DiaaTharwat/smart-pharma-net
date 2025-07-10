@@ -1,7 +1,8 @@
+// lib/view/Screens/user_purchase_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/medicine_model.dart';
-// --- تم التعديل هنا: تصحيح مسار الـ import ---
 import 'package:smart_pharma_net/models/user_purchase_model.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 import 'package:smart_pharma_net/viewmodels/purchase_viewmodel.dart';
@@ -49,7 +50,6 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
     final purchaseViewModel =
     Provider.of<PurchaseViewModel>(context, listen: false);
 
-    // الكود هنا يستخدم `UserPurchase` بشكل صحيح بعد تصحيح الـ import
     final purchaseData = UserPurchase(
       username: _usernameController.text.trim(),
       email: _emailController.text.trim(),
@@ -124,7 +124,9 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
+                    shadows: [
+                      Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))
+                    ],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -174,8 +176,8 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                       GlowingTextField(
                         controller: _phoneController,
                         hintText: 'Phone Number',
-                        prefixIcon:
-                        const Icon(Icons.phone_outlined, color: Colors.white70),
+                        prefixIcon: const Icon(Icons.phone_outlined,
+                            color: Colors.white70),
                         keyboardType: TextInputType.phone,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -188,8 +190,8 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                       GlowingTextField(
                         controller: _addressController,
                         hintText: 'Address',
-                        prefixIcon:
-                        const Icon(Icons.home_outlined, color: Colors.white70),
+                        prefixIcon: const Icon(Icons.home_outlined,
+                            color: Colors.white70),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return 'Please enter your address';
@@ -319,8 +321,13 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                     prefixIcon:
                     const Icon(Icons.credit_card, color: Colors.white70),
                     keyboardType: TextInputType.number,
-                    validator: (v) =>
-                    v == null || v.length < 16 ? 'Enter a valid card number' : null,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(16),
+                    ],
+                    validator: (v) => v == null || v.length != 16
+                        ? 'Must be 16 digits'
+                        : null,
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -331,9 +338,13 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                           hintText: 'MM/YY',
                           prefixIcon: const Icon(Icons.calendar_today,
                               color: Colors.white70),
-                          keyboardType: TextInputType.datetime,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(4),
+                          ],
                           validator: (v) =>
-                          v == null || v.length < 5 ? 'Required' : null,
+                          v == null || v.length != 4 ? 'Required' : null,
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -344,8 +355,12 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                           prefixIcon:
                           const Icon(Icons.lock, color: Colors.white70),
                           keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(3),
+                          ],
                           validator: (v) =>
-                          v == null || v.length < 3 ? 'Required' : null,
+                          v == null || v.length != 3 ? '3 digits' : null,
                         ),
                       ),
                     ],
@@ -373,7 +388,8 @@ class _UserPurchaseScreenState extends State<UserPurchaseScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 30, vertical: 12),
                   ),
                   child: const Text('Confirm Payment',
                       style: TextStyle(

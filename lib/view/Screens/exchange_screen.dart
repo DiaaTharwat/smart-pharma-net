@@ -1,8 +1,8 @@
-// lib/view/exchange/exchange_screen.dart
+// lib/view/Screens/exchange_screen.dart
 
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // ✨ تم إضافة هذه المكتبة لتهيئة شكل التاريخ
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/view/Screens/menu_bar_screen.dart';
@@ -202,6 +202,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
   Future<void> _checkPharmacyAccessAndLoadMedicines() async {
     final authViewModel = Provider.of<AuthViewModel>(context, listen: false);
     if (!authViewModel.canActAsPharmacy) {
+      // Logic for users who are not pharmacies or impersonating
     } else {
       context.read<ExchangeViewModel>().loadExchangeMedicines();
     }
@@ -249,7 +250,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
             content: Text('Failed to logout from pharmacy: ${e.toString()}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
+            shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.all(Radius.circular(10))),
           ),
         );
@@ -349,7 +350,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                 ),
                                 const NotificationIcon(),
                                 if (authViewModel.isAdmin &&
-                                    authViewModel.isPharmacy)
+                                    authViewModel.isImpersonating)
                                   IconButton(
                                     icon: const Icon(Icons.exit_to_app,
                                         color: Colors.white, size: 28),
@@ -798,10 +799,9 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     );
   }
 
-  // -- ✨ تم التحديث الكامل لهذه الدالة لإضافة حقل اختيار التاريخ ✨ --
   void _showBuyMedicineModal(ExchangeMedicineModel medicine) {
     int quantityToBuy = 1;
-    DateTime? selectedDate; // ✨ متغير لتخزين التاريخ الذي تم اختياره
+    DateTime? selectedDate;
 
     showModalBottomSheet(
       context: context,
@@ -810,25 +810,23 @@ class _ExchangeScreenState extends State<ExchangeScreen>
       builder: (modalContext) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
-            // ✨ دالة لفتح واجهة اختيار التاريخ
             Future<void> selectDate(BuildContext context) async {
               final DateTime? picked = await showDatePicker(
                 context: context,
                 initialDate: DateTime.now(),
-                firstDate: DateTime.now(), // لا يمكن اختيار تاريخ في الماضي
+                firstDate: DateTime.now(),
                 lastDate: DateTime(2101),
                 builder: (context, child) {
                   return Theme(
                     data: Theme.of(context).copyWith(
                       colorScheme: const ColorScheme.dark(
-                        primary: Color(0xFF636AE8), // لون العنوان
-                        onPrimary: Colors.white, // لون النص في العنوان
-                        onSurface: Colors.white, // لون أرقام الأيام
+                        primary: Color(0xFF636AE8),
+                        onPrimary: Colors.white,
+                        onSurface: Colors.white,
                       ),
                       textButtonTheme: TextButtonThemeData(
                         style: TextButton.styleFrom(
-                          foregroundColor:
-                          const Color(0xFF636AE8), // لون أزرار OK/Cancel
+                          foregroundColor: const Color(0xFF636AE8),
                         ),
                       ),
                     ),
@@ -940,7 +938,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                       ],
                     ),
                     const SizedBox(height: 16),
-                    // ✨ هذا هو الزر الجديد لاختيار التاريخ
                     OutlinedButton.icon(
                       icon: const Icon(Icons.calendar_today, size: 18),
                       label: Text(
@@ -973,7 +970,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                     PulsingActionButton(
                       label: 'Confirm Order',
                       onTap: () async {
-                        // ✨ فحص للتأكد من أن المستخدم اختار تاريخًا
                         if (selectedDate == null) {
                           _scaffoldMessengerKey.currentState?.showSnackBar(
                             const SnackBar(
@@ -986,7 +982,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                   BorderRadius.all(Radius.circular(10))),
                             ),
                           );
-                          return; // إيقاف التنفيذ إذا لم يتم اختيار تاريخ
+                          return;
                         }
 
                         Navigator.pop(modalContext);
@@ -1005,7 +1001,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                         }
 
                         try {
-                          // ✨ تم تحديث الاستدعاء لإرسال التاريخ
                           await this
                               .context
                               .read<ExchangeViewModel>()
@@ -1015,7 +1010,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             price: medicine.medicinePriceToSell,
                             quantity: quantityToBuy,
                             pharmacySeller: medicine.pharmacyName,
-                            // ✨ إرسال التاريخ بعد تحويله لنص متوافق مع API
                             recieveDate: selectedDate!.toIso8601String(),
                           );
                         } catch (e) {
@@ -1026,7 +1020,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                                     'Failed to place order: ${e.toString()}'),
                                 backgroundColor: Colors.red,
                                 behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
+                                shape: const RoundedRectangleBorder(
                                     borderRadius:
                                     BorderRadius.all(Radius.circular(10))),
                               ),
