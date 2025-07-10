@@ -1,16 +1,16 @@
-// lib/viewmodels/exchange_viewmodel.dart
-
 import 'package:flutter/material.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/repositories/exchange_repository.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/base_viewmodel.dart';
+import 'package:smart_pharma_net/viewmodels/dashboard_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/medicine_viewmodel.dart';
 
 class ExchangeViewModel extends BaseViewModel {
   final ExchangeRepository _exchangeRepository;
   final AuthViewModel _authViewModel;
   final MedicineViewModel _medicineViewModel;
+  final DashboardViewModel _dashboardViewModel; // الاعتمادية الجديدة
 
   List<ExchangeMedicineModel> _exchangeMedicines = [];
   List<ExchangeMedicineModel> _originalExchangeMedicines = [];
@@ -19,11 +19,14 @@ class ExchangeViewModel extends BaseViewModel {
   bool _exchangeOrderPlacedSuccessfully = false;
   bool get exchangeOrderPlacedSuccessfully => _exchangeOrderPlacedSuccessfully;
 
-  ExchangeViewModel(this._exchangeRepository, this._authViewModel, this._medicineViewModel);
+  // تحديث الـ Constructor لاستقبال الاعتمادية الجديدة
+  ExchangeViewModel(this._exchangeRepository, this._authViewModel,
+      this._medicineViewModel, this._dashboardViewModel);
 
   List<ExchangeMedicineModel> get exchangeMedicines => _exchangeMedicines;
 
-  List<String> get allExchangeMedicineNames => _originalExchangeMedicines.map((med) => med.medicineName).toList();
+  List<String> get allExchangeMedicineNames =>
+      _originalExchangeMedicines.map((med) => med.medicineName).toList();
 
   Future<void> loadExchangeMedicines() async {
     setLoading(true);
@@ -63,31 +66,32 @@ class ExchangeViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  // -- ✨ تم التصحيح النهائي والكامل ✨ --
   Future<void> createBuyOrder({
     required String medicineId,
     required String medicineName,
     required String price,
     required int quantity,
     required String pharmacySeller,
-    required String recieveDate, // حقل التاريخ الجديد
+    required String recieveDate,
   }) async {
     setError(null);
 
     try {
-      // ✨ رجعنا نجيب الـ ID والاسم زي الأول
       final pharmacyBuyerId = await _authViewModel.getPharmacyId();
       final pharmacyBuyerName = await _authViewModel.getPharmacyName();
 
       if (pharmacyBuyerId == null || pharmacyBuyerName == null) {
-        throw Exception('Cannot create order. User is not logged in as a pharmacy.');
+        throw Exception(
+            'Cannot create order. User is not logged in as a pharmacy.');
       }
 
-      int index = _originalExchangeMedicines.indexWhere((m) => m.id == medicineId);
+      int index =
+      _originalExchangeMedicines.indexWhere((m) => m.id == medicineId);
 
       if (index != -1) {
         final currentMedicine = _originalExchangeMedicines[index];
-        int currentQuantity = int.parse(currentMedicine.medicineQuantityToSell);
+        int currentQuantity =
+        int.parse(currentMedicine.medicineQuantityToSell);
         int newQuantity = currentQuantity - quantity;
 
         if (newQuantity <= 0) {
@@ -104,20 +108,21 @@ class ExchangeViewModel extends BaseViewModel {
         applySearchFilter(_searchQuery);
       }
 
-      // ✨ تم تحديث الاستدعاء عشان يبعت الـ ID تاني
       await _exchangeRepository.createBuyOrder(
         medicineName: medicineName,
         price: price,
         quantity: quantity,
         pharmacySeller: pharmacySeller,
         pharmacyBuyer: pharmacyBuyerName,
-        pharmacyBuyerId: pharmacyBuyerId, // ✨ بنبعت الـ ID هنا
+        pharmacyBuyerId: pharmacyBuyerId,
         recieveDate: recieveDate,
       );
 
+      // ✨ جوهر الإصلاح: إعلام الـ Dashboard بالتحديث ✨
+      await _dashboardViewModel.fetchDashboardStats();
+
       _exchangeOrderPlacedSuccessfully = true;
       notifyListeners();
-
     } catch (e) {
       setError(e.toString());
       await loadExchangeMedicines();
