@@ -65,7 +65,7 @@ class MedicineViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-
+  // ========== Fix Start: Updated search logic to call the API ==========
   Future<void> searchMedicines(String query, {String? pharmacyId}) async {
     _isLoading = true;
     _error = '';
@@ -73,25 +73,23 @@ class MedicineViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       if (query.isEmpty) {
-        _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
+        // If the query is empty, load the initial full list of medicines.
+        await loadMedicines(forceLoadAll: true);
       } else {
-        List<MedicineModel> allMedsToSearchFrom = List.from(_originalMedicinesList);
-
-        final lowerCaseQuery = query.toLowerCase().trim();
-        _medicines = allMedsToSearchFrom
-            .where((medicine) =>
-        medicine.name.toLowerCase().contains(lowerCaseQuery) ||
-            medicine.category.toLowerCase().contains(lowerCaseQuery))
-            .map((m) => m.copyWith(distance: null))
-            .toList();
+        // Otherwise, call the repository to search for medicines via the API.
+        final fetchedMedicines = await _medicineRepository.searchMedicines(query);
+        _medicines = fetchedMedicines.map((m) => m.copyWith(distance: null)).toList();
       }
     } catch (e) {
       _error = e.toString();
+      _medicines = []; // Clear medicines list on error
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
+  // ========== Fix End ==========
+
 
   Future<bool> addMedicine({
     required String name,

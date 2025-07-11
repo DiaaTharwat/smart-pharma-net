@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // ✨ إضافة مهمة: لاستخدام Provider
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/repositories/exchange_repository.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
@@ -10,7 +11,8 @@ class ExchangeViewModel extends BaseViewModel {
   final ExchangeRepository _exchangeRepository;
   final AuthViewModel _authViewModel;
   final MedicineViewModel _medicineViewModel;
-  final DashboardViewModel _dashboardViewModel; // الاعتمادية الجديدة
+  // ✨ تم حذف الاعتمادية على DashboardViewModel من هنا لتجنب الخطأ
+  // final DashboardViewModel _dashboardViewModel;
 
   List<ExchangeMedicineModel> _exchangeMedicines = [];
   List<ExchangeMedicineModel> _originalExchangeMedicines = [];
@@ -19,9 +21,13 @@ class ExchangeViewModel extends BaseViewModel {
   bool _exchangeOrderPlacedSuccessfully = false;
   bool get exchangeOrderPlacedSuccessfully => _exchangeOrderPlacedSuccessfully;
 
-  // تحديث الـ Constructor لاستقبال الاعتمادية الجديدة
-  ExchangeViewModel(this._exchangeRepository, this._authViewModel,
-      this._medicineViewModel, this._dashboardViewModel);
+  // ✨ تحديث الـ Constructor: تم حذف DashboardViewModel
+  ExchangeViewModel(
+      this._exchangeRepository,
+      this._authViewModel,
+      this._medicineViewModel,
+      // this._dashboardViewModel // لم نعد بحاجة إليه هنا
+      );
 
   List<ExchangeMedicineModel> get exchangeMedicines => _exchangeMedicines;
 
@@ -66,7 +72,9 @@ class ExchangeViewModel extends BaseViewModel {
     notifyListeners();
   }
 
+  // ✨ جوهر الإصلاح: إضافة BuildContext للدالة للحصول على Provider محدث
   Future<void> createBuyOrder({
+    required BuildContext context, // ✨ إضافة مهمة جداً
     required String medicineId,
     required String medicineName,
     required String price,
@@ -118,8 +126,10 @@ class ExchangeViewModel extends BaseViewModel {
         recieveDate: recieveDate,
       );
 
-      // ✨ جوهر الإصلاح: إعلام الـ Dashboard بالتحديث ✨
-      await _dashboardViewModel.fetchDashboardStats();
+      // ✨ جوهر الإصلاح: استدعاء DashboardViewModel بشكل آمن باستخدام context
+      // هذا يضمن أننا نستخدم نسخة حية وغير محذوفة
+      Provider.of<DashboardViewModel>(context, listen: false)
+          .fetchDashboardStats();
 
       _exchangeOrderPlacedSuccessfully = true;
       notifyListeners();

@@ -25,16 +25,26 @@ class MedicineRepository {
 
   MedicineRepository(this._apiService);
 
+  // ========== Fix Start: Updated to handle paginated response ==========
   Future<List<MedicineModel>> getAllMedicines() async {
     try {
       print('Getting all medicines from public endpoint...');
       final response = await _apiService.get(_publicSearchEndpoint);
-      return _processMedicineList(response, 'all-medicines');
+
+      // The response from the server is now paginated. We need to extract the 'results' list.
+      if (response is Map<String, dynamic> && response.containsKey('results')) {
+        return _processMedicineList(response['results'], 'all-medicines');
+      }
+
+      print('Invalid or unexpected response format from all-medicines: $response');
+      // Return empty list if the format is not what we expect.
+      return [];
     } catch (e) {
       print('Error getting all medicines: $e');
       rethrow;
     }
   }
+  // ========== Fix End ==========
 
   // ========== Fix Start: Added Role-based Endpoint Logic ==========
   Future<List<MedicineModel>> getMedicinesForPharmacy(String pharmacyId) async {
@@ -60,20 +70,29 @@ class MedicineRepository {
   }
   // ========== Fix End ==========
 
+  // ========== Fix Start: Updated to use correct query parameter and handle paginated response ==========
   Future<List<MedicineModel>> searchMedicines(String query) async {
     try {
-      print('Searching medicines with query: $query');
-      final response = await _apiService.get('$_publicSearchEndpoint?query=${Uri.encodeComponent(query)}');
-      if (response is List) {
-        final medicines = response.map((json) => MedicineModel.fromJson(json)).toList();
-        return medicines;
+      // The swagger file now uses 'search' as the query parameter, not 'query'.
+      final endpoint = '$_publicSearchEndpoint?search=${Uri.encodeComponent(query)}';
+      print('Searching medicines with query: "$query" at endpoint: $endpoint');
+      final response = await _apiService.get(endpoint);
+
+      // The response from the server is paginated. We need to extract the 'results' list.
+      if (response is Map<String, dynamic> && response.containsKey('results')) {
+        return _processMedicineList(response['results'], 'search-medicines');
       }
-      throw Exception('Invalid search response format');
+
+      print('Invalid or unexpected response format from search-medicines: $response');
+      // Return empty list if the format is not what we expect.
+      return [];
     } catch (e) {
       print('Error searching medicines: $e');
       rethrow;
     }
   }
+  // ========== Fix End ==========
+
 
   Future<MedicineModel> getMedicineDetails(String id) async {
     try {

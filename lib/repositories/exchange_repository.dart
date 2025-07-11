@@ -11,10 +11,21 @@ class ExchangeRepository {
   Future<List<ExchangeMedicineModel>> getExchangeList() async {
     try {
       print('Fetching exchange list from backend...');
-      final response = await _apiService.authenticatedGet('exchange/exchange_list/');
+      final response =
+      await _apiService.authenticatedGet('exchange/exchange_list/');
 
-      if (response is List) {
-        return response.map((json) => ExchangeMedicineModel.fromJson(json)).toList();
+      // The new Swagger spec returns a paginated response object, not a direct list.
+      // We need to extract the 'results' list from it.
+      if (response is Map<String, dynamic> && response.containsKey('results')) {
+        final results = response['results'] as List;
+        return results
+            .map((json) => ExchangeMedicineModel.fromJson(json))
+            .toList();
+      } else if (response is List) {
+        // Fallback for the old format, just in case.
+        return response
+            .map((json) => ExchangeMedicineModel.fromJson(json))
+            .toList();
       }
       throw Exception('Invalid response format for exchange list');
     } catch (e) {
@@ -30,9 +41,9 @@ class ExchangeRepository {
     required String price,
     required int quantity,
     required String pharmacySeller, // Name of the selling pharmacy
-    required String pharmacyBuyer,  // Name of the buying pharmacy
+    required String pharmacyBuyer, // Name of the buying pharmacy
     required String pharmacyBuyerId, // ✨ رجعنا نستخدم الـ ID تاني
-    required String recieveDate,    // The new date field
+    required String recieveDate, // The new date field
   }) async {
     try {
       print('Creating buy order for pharmacy ID: $pharmacyBuyerId...');
@@ -43,7 +54,7 @@ class ExchangeRepository {
         'pharmacy_seller': pharmacySeller,
         'pharmacy_buyer': pharmacyBuyer,
         'recieve_date': recieveDate,
-        'status': 'Pending',
+        'status': 'Pending', // Status is set to Pending by default on creation
       };
       print('Payload: $payload');
 

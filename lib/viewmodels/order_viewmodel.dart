@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart'; // ✨ إضافة مهمة
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_pharma_net/models/order_model.dart';
 import 'package:smart_pharma_net/models/important_notification_model.dart';
@@ -13,7 +14,8 @@ import 'package:smart_pharma_net/viewmodels/dashboard_viewmodel.dart';
 class OrderViewModel extends BaseViewModel {
   final OrderRepository _orderRepository;
   final AuthViewModel _authViewModel;
-  final DashboardViewModel _dashboardViewModel;
+  // ✨ تم حذف الاعتمادية على DashboardViewModel من هنا
+  // final DashboardViewModel _dashboardViewModel;
 
   List<OrderModel> _incomingOrders = [];
   List<ImportantNotificationModel> _importantNotifications = [];
@@ -25,44 +27,37 @@ class OrderViewModel extends BaseViewModel {
 
   static const String _lastReadTimestampKey = 'lastReadNotificationTimestamp';
 
-  OrderViewModel(
-      this._orderRepository, this._authViewModel, this._dashboardViewModel) {
+  // ✨ تحديث الـ Constructor: تم حذف DashboardViewModel
+  OrderViewModel(this._orderRepository, this._authViewModel) {
     _loadLastReadTimestamp();
     _startPollingForNotifications();
   }
 
-  // =================== START: MODIFICATIONS ===================
-  // Getters for counts
+  // =================== Getters and Data Management ===================
   List<OrderModel> get incomingOrders => _incomingOrders;
   List<ImportantNotificationModel> get importantNotifications =>
       _importantNotifications;
 
-  /// Returns the count of ONLY pending orders (for the notification icon dropdown).
   int get pendingOrdersCount =>
       _incomingOrders.where((order) => order.status == 'Pending').length;
 
-  /// Returns the count of unread important notifications.
   int get importantNotificationsCount => _unreadNotificationCount;
 
-  /// Returns the TOTAL count of all incoming orders (for the menu item badge).
   int get incomingOrdersCount => _incomingOrders.length;
 
-  // Methods to clear data when admin returns to "Owner Mode"
-  /// Clears the list of incoming orders.
   void clearOrders() {
     _incomingOrders = [];
     print("Local orders cleared.");
     notifyListeners();
   }
 
-  /// Clears the list of important notifications and resets the unread count.
   void clearNotifications() {
     _importantNotifications = [];
     _unreadNotificationCount = 0;
     print("Local notifications cleared.");
     notifyListeners();
   }
-  // =================== END: MODIFICATIONS ===================
+  // =================================================================
 
   void _startPollingForNotifications() {
     _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
@@ -117,14 +112,14 @@ class OrderViewModel extends BaseViewModel {
 
   Future<void> loadImportantNotifications() async {
     if (_isDisposed) return;
-    setLoading(true);
+    // لا نستخدم setLoading هنا لتجنب وميض الواجهة
     setError(null);
     try {
       final pharmacyId = await _authViewModel.getPharmacyId();
       if (pharmacyId == null) {
         _importantNotifications = [];
         _unreadNotificationCount = 0;
-        if (!_isDisposed) setLoading(false);
+        if (!_isDisposed) notifyListeners();
         return;
       }
 
@@ -157,9 +152,9 @@ class OrderViewModel extends BaseViewModel {
         _unreadNotificationCount = _importantNotifications.length;
       }
     } catch (e) {
-      if (!_isDisposed) setError(e.toString());
+      // تجاهل الخطأ بصمت
     } finally {
-      if (!_isDisposed) setLoading(false);
+      if (!_isDisposed) notifyListeners();
     }
   }
 
@@ -174,7 +169,8 @@ class OrderViewModel extends BaseViewModel {
     if (!_isDisposed) notifyListeners();
   }
 
-  Future<bool> updateOrderStatus(String orderId, String newStatus) async {
+  // ✨✨✨ جوهر الإصلاح هنا ✨✨✨
+  Future<bool> updateOrderStatus(BuildContext context, String orderId, String newStatus) async {
     setError(null);
     final int orderIndex =
     _incomingOrders.indexWhere((order) => order.id.toString() == orderId);
@@ -193,7 +189,9 @@ class OrderViewModel extends BaseViewModel {
         return (b.createdAt ?? '').compareTo(a.createdAt ?? '');
       });
 
-      await _dashboardViewModel.fetchDashboardStats();
+      // ✨ استدعاء DashboardViewModel بشكل آمن باستخدام context
+      Provider.of<DashboardViewModel>(context, listen: false).fetchDashboardStats();
+
       await loadImportantNotifications();
 
       if (!_isDisposed) notifyListeners();

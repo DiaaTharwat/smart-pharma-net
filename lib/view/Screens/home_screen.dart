@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -41,6 +42,11 @@ class _HomeScreenState extends State<HomeScreen>
   bool _isListening = false;
   File? _selectedImage;
   final TextRecognizer _textRecognizer = TextRecognizer();
+
+  // ========== Fix Start: Added debounce timer for search ==========
+  Timer? _debounce;
+  // ========== Fix End ==========
+
 
   @override
   void initState() {
@@ -219,17 +225,24 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  // ========== Fix Start: Added debounce logic to prevent excessive API calls ==========
   void _triggerSearch(String query) {
-    if (_isSortingByDistance) {
-      setState(() {
-        _isSortingByDistance = false;
-      });
-    }
-    final authViewModel = context.read<AuthViewModel>();
-    context
-        .read<MedicineViewModel>()
-        .searchMedicines(query, pharmacyId: authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+
+      if (_isSortingByDistance) {
+        setState(() {
+          _isSortingByDistance = false;
+        });
+      }
+      final authViewModel = context.read<AuthViewModel>();
+      context
+          .read<MedicineViewModel>()
+          .searchMedicines(query, pharmacyId: authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
+    });
   }
+  // ========== Fix End ==========
 
 
   @override
@@ -238,6 +251,9 @@ class _HomeScreenState extends State<HomeScreen>
     _animationController.dispose();
     _textRecognizer.close();
     _speechToText.cancel();
+    // ========== Fix Start: Cancel the debounce timer on dispose ==========
+    _debounce?.cancel();
+    // ========== Fix End ==========
     super.dispose();
   }
 

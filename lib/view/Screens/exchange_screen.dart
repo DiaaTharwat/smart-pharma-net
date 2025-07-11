@@ -1,5 +1,3 @@
-// lib/view/Screens/exchange_screen.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -279,22 +277,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
           body: InteractiveParticleBackground(
             child: Consumer<ExchangeViewModel>(
               builder: (context, exchangeViewModel, child) {
-                if (exchangeViewModel.exchangeOrderPlacedSuccessfully) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Exchange order placed successfully!'),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                        ),
-                      ),
-                    );
-                    exchangeViewModel.resetExchangeOrderPlacedSuccess();
-                  });
-                }
-
+                // This logic was moved to the createBuyOrder method to be more reliable
                 return Column(
                   children: [
                     Container(
@@ -971,7 +954,7 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                       label: 'Confirm Order',
                       onTap: () async {
                         if (selectedDate == null) {
-                          _scaffoldMessengerKey.currentState?.showSnackBar(
+                          ScaffoldMessenger.of(modalContext).showSnackBar( // Use modalContext
                             const SnackBar(
                               content: Text(
                                   'Please select an expected receive date.'),
@@ -985,26 +968,32 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                           return;
                         }
 
-                        Navigator.pop(modalContext);
+                        // Get references BEFORE the async gap.
+                        final navigator = Navigator.of(modalContext);
+                        final scaffoldMessenger =
+                            _scaffoldMessengerKey.currentState;
+                        final exchangeViewModel =
+                        context.read<ExchangeViewModel>();
 
-                        if (mounted) {
-                          _scaffoldMessengerKey.currentState?.showSnackBar(
-                            const SnackBar(
-                              content: Text('Sending order...'),
-                              backgroundColor: Colors.blueAccent,
-                              behavior: SnackBarBehavior.floating,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                  BorderRadius.all(Radius.circular(10))),
+                        // Pop the modal sheet.
+                        navigator.pop();
+
+                        // Show an informational SnackBar on the main screen.
+                        scaffoldMessenger?.showSnackBar(
+                          const SnackBar(
+                            content: Text('Sending request...'),
+                            backgroundColor: Colors.blueAccent,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                              BorderRadius.all(Radius.circular(10)),
                             ),
-                          );
-                        }
+                          ),
+                        );
 
                         try {
-                          await this
-                              .context
-                              .read<ExchangeViewModel>()
-                              .createBuyOrder(
+                          await exchangeViewModel.createBuyOrder(
+                            context: this.context, // Use the screen's context
                             medicineId: medicine.id,
                             medicineName: medicine.medicineName,
                             price: medicine.medicinePriceToSell,
@@ -1012,20 +1001,36 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             pharmacySeller: medicine.pharmacyName,
                             recieveDate: selectedDate!.toIso8601String(),
                           );
-                        } catch (e) {
-                          if (mounted) {
-                            _scaffoldMessengerKey.currentState?.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                    'Failed to place order: ${e.toString()}'),
-                                backgroundColor: Colors.red,
-                                behavior: SnackBarBehavior.floating,
-                                shape: const RoundedRectangleBorder(
-                                    borderRadius:
-                                    BorderRadius.all(Radius.circular(10))),
+
+                          if (!mounted) return;
+
+                          scaffoldMessenger?.hideCurrentSnackBar();
+                          scaffoldMessenger?.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'The order has been successfully sent!'),
+                              backgroundColor: Colors.green,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                BorderRadius.all(Radius.circular(10)),
                               ),
-                            );
-                          }
+                            ),
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                          scaffoldMessenger?.hideCurrentSnackBar();
+                          scaffoldMessenger?.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  'Failed to send request: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                              shape: const RoundedRectangleBorder(
+                                  borderRadius:
+                                  BorderRadius.all(Radius.circular(10))),
+                            ),
+                          );
                         }
                       },
                     ),
