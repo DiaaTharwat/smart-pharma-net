@@ -65,11 +65,9 @@ class _MenuBarScreenState extends State<MenuBarScreen>
             .read<PharmacyViewModel>()
             .loadPharmacies(searchQuery: '', authViewModel: authViewModel);
       }
-      // Assuming initial data for orders/notifications might need to be loaded
-      // This will trigger a fetch if a pharmacy is already selected (e.g., from a previous session)
       if (authViewModel.canActAsPharmacy) {
         context.read<OrderViewModel>().loadImportantNotifications();
-        context.read<OrderViewModel>().loadIncomingOrders();
+        // The call to loadIncomingOrders is already handled in the OrderViewModel constructor
       }
     });
   }
@@ -121,15 +119,13 @@ class _MenuBarScreenState extends State<MenuBarScreen>
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
-  // =================== START: MODIFICATION 1 ===================
-  // I've added an optional `badgeCount` parameter to display a number next to the title.
   Widget _buildMenuItem({
     required IconData icon,
     required String title,
     required VoidCallback? onTap,
     bool isDisabled = false,
     Color? iconColor,
-    int? badgeCount, // This is the new parameter
+    int? badgeCount,
   }) {
     final color = isDisabled ? Colors.grey.shade600 : Colors.white;
     final finalIconColor =
@@ -157,7 +153,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                   style: TextStyle(
                       fontSize: 18, fontWeight: FontWeight.w500, color: color),
                 ),
-                // This part will build the badge if `badgeCount` is provided and greater than 0
                 if (badgeCount != null && badgeCount > 0) ...[
                   const SizedBox(width: 8),
                   CircleAvatar(
@@ -182,12 +177,10 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       ),
     );
   }
-  // =================== END: MODIFICATION 1 ===================
 
   Widget _buildPharmacySelector(BuildContext context) {
     final authVm = context.watch<AuthViewModel>();
     final pharmacyVm = context.watch<PharmacyViewModel>();
-    // We need to `read` these ViewModels to call their methods inside `onChanged`
     final dashboardVm = context.read<DashboardViewModel>();
     final orderVm = context.read<OrderViewModel>();
 
@@ -233,28 +226,21 @@ class _MenuBarScreenState extends State<MenuBarScreen>
               );
             }).toList(),
           ],
-          // =================== START: MODIFICATION 2 ===================
-          // This is the updated `onChanged` logic.
-          // It now fetches all necessary data immediately after the selection changes.
           onChanged: (String? newValue) {
             if (newValue == 'owner_mode') {
               authVm.stopImpersonation();
-              // When returning to owner mode, clear the pharmacy-specific data
-              orderVm.clearNotifications();
               orderVm.clearOrders();
+              orderVm.clearNotifications();
             } else if (newValue != null) {
               final selectedPharmacy = pharmacyVm.pharmacies
                   .firstWhere((p) => p.id.toString() == newValue);
               authVm.impersonatePharmacy(selectedPharmacy);
             }
 
-            // After any change (impersonating or stopping), update all relevant data.
-            // This is the key to solving the problem.
             dashboardVm.fetchDashboardStats();
             orderVm.loadImportantNotifications();
             orderVm.loadIncomingOrders();
           },
-          // =================== END: MODIFICATION 2 ===================
         ),
       ),
     );
@@ -290,6 +276,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
       body: InteractiveParticleBackground(
         child: Column(
           children: [
+            // ... (Header code remains the same)
             Container(
               padding: const EdgeInsets.fromLTRB(20, 48, 20, 20),
               child: SafeArea(
@@ -315,7 +302,6 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                             },
                             tooltip: 'Settings',
                           ),
-                        // The NotificationIcon will automatically update because it listens to OrderViewModel
                         if (authViewModel.canActAsPharmacy)
                           const NotificationIcon(),
                       ],
@@ -415,23 +401,21 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                           ? () => _navigateTo(context, const PricingScreen())
                           : _showSelectPharmacyDialog,
                     ),
-                    // =================== START: MODIFICATION 3 ===================
-                    // This is the `Incoming Orders` button.
-                    // It's now wrapped in a `Consumer` to get the latest order count and display it as a badge.
+                    // Incoming orders for Admin (Impersonating)
                     if (authViewModel.isImpersonating)
                       Consumer<OrderViewModel>(
                         builder: (context, orderVm, child) {
                           return _buildMenuItem(
                             icon: Icons.shopping_cart,
                             title: 'Incoming Orders',
-                            badgeCount: orderVm.incomingOrdersCount, // Pass the count here
+                            badgeCount: orderVm.newOrdersCount, // استخدام الـ Getter الجديد
                             onTap: () => _navigateTo(
                                 context, const PharmacyOrdersScreen()),
                           );
                         },
                       ),
-                    // =================== END: MODIFICATION 3 ===================
                   ] else if (authViewModel.isPharmacy) ...[
+                    // Menu items for Pharmacy account
                     _buildMenuItem(
                       icon: Icons.store,
                       title: 'My Pharmacy Details',
@@ -448,13 +432,13 @@ class _MenuBarScreenState extends State<MenuBarScreen>
                       title: 'Subscriptions',
                       onTap: () => _navigateTo(context, const PricingScreen()),
                     ),
-                    // Also apply the badge to the pharmacy's own view
+                    // Incoming orders for Pharmacy's own view
                     Consumer<OrderViewModel>(
                       builder: (context, orderVm, child) {
                         return _buildMenuItem(
                           icon: Icons.shopping_cart,
                           title: 'My Incoming Orders',
-                          badgeCount: orderVm.incomingOrdersCount,
+                          badgeCount: orderVm.newOrdersCount, // استخدام الـ Getter الجديد
                           onTap: () =>
                               _navigateTo(context, const PharmacyOrdersScreen()),
                         );

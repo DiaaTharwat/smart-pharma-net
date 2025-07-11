@@ -1,3 +1,5 @@
+// lib/view/Screens/exchange_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -988,21 +990,24 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                     PulsingActionButton(
                       label: 'Confirm Order',
                       onTap: () async {
+                        // =================== START: THE FIX ===================
+                        // هنا هو التعديل. بنتحقق من التاريخ أول حاجة
                         if (selectedDate == null) {
+                          // بنستخدم modalContext عشان الرسالة تظهر فوق الـ modal sheet
                           ScaffoldMessenger.of(modalContext).showSnackBar(
-                            // Use modalContext
                             const SnackBar(
                               content: Text(
                                   'Please select an expected receive date.'),
-                              backgroundColor: Colors.orangeAccent,
+                              backgroundColor: Colors.redAccent,
                               behavior: SnackBarBehavior.floating,
                               shape: RoundedRectangleBorder(
                                   borderRadius:
                                   BorderRadius.all(Radius.circular(10))),
                             ),
                           );
-                          return;
+                          return; // بنوقف باقي الكود لو مفيش تاريخ
                         }
+                        // =================== END: THE FIX ===================
 
                         // Get references BEFORE the async gap.
                         final navigator = Navigator.of(modalContext);
