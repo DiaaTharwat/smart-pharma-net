@@ -43,10 +43,8 @@ class _HomeScreenState extends State<HomeScreen>
   File? _selectedImage;
   final TextRecognizer _textRecognizer = TextRecognizer();
 
-  // ========== Fix Start: Added debounce timer for search ==========
   Timer? _debounce;
-  // ========== Fix End ==========
-
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -72,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen>
     );
     _animationController.forward();
     _initSpeech();
+    _scrollController.addListener(_onScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final authViewModel = context.read<AuthViewModel>();
@@ -79,12 +78,24 @@ class _HomeScreenState extends State<HomeScreen>
       final pharmacyViewModel = context.read<PharmacyViewModel>();
 
       medicineViewModel.loadMedicines(
-          pharmacyId: authViewModel.activePharmacyId, forceLoadAll: authViewModel.isAdmin && !authViewModel.canActAsPharmacy);
+          pharmacyId: authViewModel.activePharmacyId,
+          forceLoadAll:
+          authViewModel.isAdmin && !authViewModel.canActAsPharmacy);
 
-      pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel).catchError((error) {
-        print("Could not load pharmacies, continuing without them. Error: $error");
+      pharmacyViewModel
+          .loadPharmacies(searchQuery: '', authViewModel: authViewModel)
+          .catchError((error) {
+        print(
+            "Could not load pharmacies, continuing without them. Error: $error");
       });
     });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      context.read<MedicineViewModel>().loadMoreMedicines();
+    }
   }
 
   void _initSpeech() async {
@@ -140,7 +151,8 @@ class _HomeScreenState extends State<HomeScreen>
         pauseFor: const Duration(seconds: 2),
       );
     } else {
-      print('Could not start listening. Speech enabled: $_speechEnabled, Is listening: $_isListening');
+      print(
+          'Could not start listening. Speech enabled: $_speechEnabled, Is listening: $_isListening');
     }
   }
 
@@ -150,21 +162,22 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // --- ✅ الخطوة 2: تعديل دالة البحث بالصورة بالكامل ---
   void _pickImageAndRecognizeText() async {
     final medicineViewModel = context.read<MedicineViewModel>();
 
-    // التأكد من وجود أدوية للمقارنة بها
     if (medicineViewModel.allMedicineNames.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Medicine list is not loaded yet. Please try again in a moment.")),
+        const SnackBar(
+            content: Text(
+                "Medicine list is not loaded yet. Please try again in a moment.")),
       );
       return;
     }
 
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+      final XFile? imageFile =
+      await picker.pickImage(source: ImageSource.gallery);
 
       if (imageFile == null) return;
 
@@ -175,38 +188,38 @@ class _HomeScreenState extends State<HomeScreen>
       }
 
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
-      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
+      final RecognizedText recognizedText =
+      await _textRecognizer.processImage(inputImage);
 
       final String fullTextFromImage = recognizedText.text;
 
       if (fullTextFromImage.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not recognize any text in the image.")),
+          const SnackBar(
+              content: Text("Could not recognize any text in the image.")),
         );
-        _clearImageSearch(); // مسح الصورة إذا لم يتم العثور على نص
+        _clearImageSearch();
         return;
       }
 
-      // جلب قائمة أسماء الأدوية من الـ ViewModel
       final List<String> medicineNames = medicineViewModel.allMedicineNames;
 
-      // استخدام المكتبة الجديدة لإيجاد أفضل تطابق
-      final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
+      final BestMatch bestMatch =
+      StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
 
-      // نتحقق من أن أفضل تطابق له تقييم جيد (مثلاً فوق 0.4) لتجنب النتائج الخاطئة
-      if (bestMatch.bestMatch.rating != null && bestMatch.bestMatch.rating! > 0.3) {
+      if (bestMatch.bestMatch.rating != null &&
+          bestMatch.bestMatch.rating! > 0.3) {
         final String foundMedicineName = bestMatch.bestMatch.target!;
         _searchController.text = foundMedicineName;
-        _searchController.selection = TextSelection.fromPosition(TextPosition(offset: _searchController.text.length));
+        _searchController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _searchController.text.length));
         _triggerSearch(foundMedicineName);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Could not find a matching medicine.")),
         );
-        // يمكنك اختيار مسح حقل البحث أو تركه كما هو
         _clearImageSearch();
       }
-
     } catch (e) {
       print("Error picking image or recognizing text: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -215,7 +228,6 @@ class _HomeScreenState extends State<HomeScreen>
       _clearImageSearch();
     }
   }
-  // -------------------------------------------------------------
 
   void _clearImageSearch() {
     setState(() {
@@ -225,7 +237,6 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  // ========== Fix Start: Added debounce logic to prevent excessive API calls ==========
   void _triggerSearch(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () {
@@ -237,13 +248,11 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
       final authViewModel = context.read<AuthViewModel>();
-      context
-          .read<MedicineViewModel>()
-          .searchMedicines(query, pharmacyId: authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
+      context.read<MedicineViewModel>().searchMedicines(query,
+          pharmacyId:
+          authViewModel.isPharmacy ? authViewModel.activePharmacyId : null);
     });
   }
-  // ========== Fix End ==========
-
 
   @override
   void dispose() {
@@ -251,9 +260,9 @@ class _HomeScreenState extends State<HomeScreen>
     _animationController.dispose();
     _textRecognizer.close();
     _speechToText.cancel();
-    // ========== Fix Start: Cancel the debounce timer on dispose ==========
     _debounce?.cancel();
-    // ========== Fix End ==========
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -271,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _returnToAdminHomeAndLogoutPharmacy() async {
     final authViewModel = context.read<AuthViewModel>();
     await authViewModel.restoreAdminSession();
-    if(mounted) {
+    if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const HomeScreen()),
@@ -282,7 +291,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<LatLng?> _getUserLocation() async {
     try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high);
       return LatLng(position.latitude, position.longitude);
     } catch (e) {
       print("Failed to get location: $e");
@@ -290,7 +300,8 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _handleDeleteMedicine(BuildContext context, MedicineModel medicine) async {
+  Future<void> _handleDeleteMedicine(
+      BuildContext context, MedicineModel medicine) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -299,11 +310,18 @@ class _HomeScreenState extends State<HomeScreen>
           borderRadius: BorderRadius.circular(15),
           side: BorderSide(color: const Color(0xFF636AE8).withOpacity(0.5)),
         ),
-        title: const Text('Confirm Delete', style: TextStyle(color: Colors.white)),
-        content: Text('Are you sure you want to delete ${medicine.name}?', style: TextStyle(color: Colors.white70)),
+        title:
+        const Text('Confirm Delete', style: TextStyle(color: Colors.white)),
+        content: Text('Are you sure you want to delete ${medicine.name}?',
+            style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Delete', style: TextStyle(color: Colors.redAccent))),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Delete',
+                  style: TextStyle(color: Colors.redAccent))),
         ],
       ),
     );
@@ -312,24 +330,32 @@ class _HomeScreenState extends State<HomeScreen>
       final medicineViewModel = context.read<MedicineViewModel>();
       final authViewModel = context.read<AuthViewModel>();
       try {
-        await medicineViewModel.deleteMedicine(pharmacyId: medicine.pharmacyId, medicineId: medicine.id);
+        await medicineViewModel.deleteMedicine(
+            pharmacyId: medicine.pharmacyId, medicineId: medicine.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Medicine deleted successfully'), backgroundColor: Colors.green),
+            const SnackBar(
+                content: Text('Medicine deleted successfully'),
+                backgroundColor: Colors.green),
           );
-          medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: authViewModel.isAdmin);
+          medicineViewModel.loadMedicines(
+              pharmacyId: authViewModel.activePharmacyId,
+              forceLoadAll: authViewModel.isAdmin);
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete medicine: ${e.toString()}'), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text('Failed to delete medicine: ${e.toString()}'),
+                backgroundColor: Colors.red),
           );
         }
       }
     }
   }
 
-  Future<void> _handleEditMedicine(BuildContext context, MedicineModel medicine) async {
+  Future<void> _handleEditMedicine(
+      BuildContext context, MedicineModel medicine) async {
     final authViewModel = context.read<AuthViewModel>();
     final result = await Navigator.push<bool>(
       context,
@@ -346,25 +372,29 @@ class _HomeScreenState extends State<HomeScreen>
             content: Text('Medicine updated successfully!'),
             backgroundColor: Colors.green),
       );
-      context.read<MedicineViewModel>().loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: authViewModel.isAdmin);
+      context.read<MedicineViewModel>().loadMedicines(
+          pharmacyId: authViewModel.activePharmacyId,
+          forceLoadAll: authViewModel.isAdmin);
     }
   }
 
-  Widget _buildMedicineCard(BuildContext context, MedicineModel medicine, double cardWidth) {
+  Widget _buildMedicineCard(
+      BuildContext context, MedicineModel medicine, double cardWidth) {
     final authViewModel = context.watch<AuthViewModel>();
     final pharmacyViewModel = context.watch<PharmacyViewModel>();
 
     bool canManage = false;
 
     if (authViewModel.isAdmin && !authViewModel.isImpersonating) {
-      final ownedPharmacyIds = pharmacyViewModel.pharmacies.map((p) => p.id).toSet();
+      final ownedPharmacyIds =
+      pharmacyViewModel.pharmacies.map((p) => p.id).toSet();
       canManage = ownedPharmacyIds.contains(medicine.pharmacyId);
-    }
-    else if (authViewModel.canActAsPharmacy) {
+    } else if (authViewModel.canActAsPharmacy) {
       canManage = medicine.pharmacyId == authViewModel.activePharmacyId;
     }
 
-    final bool isNormalUser = !authViewModel.isAdmin && !authViewModel.isPharmacy;
+    final bool isNormalUser =
+        !authViewModel.isAdmin && !authViewModel.isPharmacy;
 
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
@@ -377,10 +407,14 @@ class _HomeScreenState extends State<HomeScreen>
           if (loadingProgress == null) return child;
           return const Center(child: CircularProgressIndicator());
         },
-        errorBuilder: (context, error, stackTrace) => const Icon(Icons.medication_liquid_outlined, size: 90, color: Color(0xFF636AE8)),
+        errorBuilder: (context, error, stackTrace) => const Icon(
+            Icons.medication_liquid_outlined,
+            size: 90,
+            color: Color(0xFF636AE8)),
       );
     } else {
-      imageWidget = const Icon(Icons.medication_liquid_outlined, size: 90, color: Color(0xFF636AE8));
+      imageWidget = const Icon(Icons.medication_liquid_outlined,
+          size: 90, color: Color(0xFF636AE8));
     }
 
     return Container(
@@ -388,9 +422,13 @@ class _HomeScreenState extends State<HomeScreen>
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A2E),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
+        border: Border.all(
+            color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0),
         boxShadow: [
-          BoxShadow(color: const Color(0xFF636AE8).withOpacity(0.15), blurRadius: 15, spreadRadius: 2),
+          BoxShadow(
+              color: const Color(0xFF636AE8).withOpacity(0.15),
+              blurRadius: 15,
+              spreadRadius: 2),
         ],
       ),
       child: ClipRRect(
@@ -407,21 +445,26 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   Container(
                     height: 140,
-                    decoration: BoxDecoration(color: const Color(0xFF636AE8).withOpacity(0.2)),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF636AE8).withOpacity(0.2)),
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
                         ClipRRect(
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20)),
                           child: imageWidget,
                         ),
                         if (medicine.canBeSell)
                           Positioned(
-                            top: 5, right: 5,
+                            top: 5,
+                            right: 5,
                             child: Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                              child: const Icon(Icons.swap_horiz, color: Colors.white, size: 16),
+                              decoration: const BoxDecoration(
+                                  color: Colors.green, shape: BoxShape.circle),
+                              child: const Icon(Icons.swap_horiz,
+                                  color: Colors.white, size: 16),
                             ),
                           ),
                       ],
@@ -433,24 +476,48 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(medicine.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(medicine.name,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
-                        Text(medicine.category, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(medicine.category,
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.white.withOpacity(0.6)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
                         if (!authViewModel.isPharmacy)
                           Row(
                             children: [
-                              Icon(Icons.store_outlined, size: 12, color: Colors.white.withOpacity(0.7)),
+                              Icon(Icons.store_outlined,
+                                  size: 12,
+                                  color: Colors.white.withOpacity(0.7)),
                               const SizedBox(width: 4),
-                              Expanded(child: Text(medicine.pharmacyName, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7)), overflow: TextOverflow.ellipsis)),
+                              Expanded(
+                                  child: Text(medicine.pharmacyName,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color:
+                                          Colors.white.withOpacity(0.7)),
+                                      overflow: TextOverflow.ellipsis)),
                             ],
                           ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.calendar_today_outlined, size: 11, color: Colors.white.withOpacity(0.7)),
+                            Icon(Icons.calendar_today_outlined,
+                                size: 11,
+                                color: Colors.white.withOpacity(0.7)),
                             const SizedBox(width: 4),
-                            Text('Exp: ${medicine.expiryDate}', style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+                            Text('Exp: ${medicine.expiryDate}',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white.withOpacity(0.7))),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -458,8 +525,14 @@ class _HomeScreenState extends State<HomeScreen>
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Text('${medicine.quantity} units', style: const TextStyle(fontSize: 13, color: Colors.white)),
-                            Text('\$${medicine.price.toStringAsFixed(2)}', style: const TextStyle(fontSize: 17, color: Color(0xFF4CAF50), fontWeight: FontWeight.bold)),
+                            Text('${medicine.quantity} units',
+                                style: const TextStyle(
+                                    fontSize: 13, color: Colors.white)),
+                            Text('\$${medicine.price.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontSize: 17,
+                                    color: Color(0xFF4CAF50),
+                                    fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],
@@ -478,29 +551,40 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildAdminActionButtons(BuildContext context, MedicineModel medicine) {
+  Widget _buildAdminActionButtons(
+      BuildContext context, MedicineModel medicine) {
     return Container(
       decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: const Color(0xFF636AE8).withOpacity(0.3), width: 1.0))
-      ),
+          border: Border(
+              top: BorderSide(
+                  color: const Color(0xFF636AE8).withOpacity(0.3),
+                  width: 1.0))),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           Expanded(
             child: TextButton.icon(
               icon: const Icon(Icons.edit, color: Colors.white70, size: 18),
-              label: const Text('Edit', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              label: const Text('Edit',
+                  style: TextStyle(color: Colors.white70, fontSize: 12)),
               onPressed: () => _handleEditMedicine(context, medicine),
-              style: TextButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              style: TextButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap),
             ),
           ),
-          Container(height: 20, width: 1, color: const Color(0xFF636AE8).withOpacity(0.3)),
+          Container(
+              height: 20,
+              width: 1,
+              color: const Color(0xFF636AE8).withOpacity(0.3)),
           Expanded(
             child: TextButton.icon(
-              icon: const Icon(Icons.delete_forever, color: Colors.redAccent, size: 18),
-              label: const Text('Delete', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+              icon: const Icon(Icons.delete_forever,
+                  color: Colors.redAccent, size: 18),
+              label: const Text('Delete',
+                  style: TextStyle(color: Colors.redAccent, fontSize: 12)),
               onPressed: () => _handleDeleteMedicine(context, medicine),
-              style: TextButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              style: TextButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap),
             ),
           ),
         ],
@@ -508,7 +592,8 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildUserActionButtons(BuildContext context, MedicineModel medicine) {
+  Widget _buildUserActionButtons(
+      BuildContext context, MedicineModel medicine) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
       child: ElevatedButton.icon(
@@ -517,15 +602,18 @@ class _HomeScreenState extends State<HomeScreen>
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => UserPurchaseScreen(medicine: medicine)),
+            MaterialPageRoute(
+                builder: (context) => UserPurchaseScreen(medicine: medicine)),
           );
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF636AE8),
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 10),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle:
+          const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );
@@ -545,8 +633,10 @@ class _HomeScreenState extends State<HomeScreen>
             return Container(
               decoration: BoxDecoration(
                 color: const Color(0xFF0F0F1A),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-                border: Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
+                borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(25)),
+                border:
+                Border.all(color: const Color(0xFF636AE8).withOpacity(0.3)),
               ),
               child: Column(
                 children: [
@@ -554,14 +644,20 @@ class _HomeScreenState extends State<HomeScreen>
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: const Color(0xFF636AE8).withOpacity(0.6),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                      borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(25)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.medication_outlined, color: Colors.white, size: 30),
+                        const Icon(Icons.medication_outlined,
+                            color: Colors.white, size: 30),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(medicine.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                          child: Text(medicine.name,
+                              style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
                         ),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.white),
@@ -579,13 +675,17 @@ class _HomeScreenState extends State<HomeScreen>
                         children: [
                           _buildDetailRow('Pharmacy', medicine.pharmacyName),
                           _buildDetailRow('Description', medicine.description),
-                          _buildDetailRow('Price', '\$${medicine.price.toStringAsFixed(2)}'),
-                          _buildDetailRow('Quantity', '${medicine.quantity} units'),
+                          _buildDetailRow('Price',
+                              '\$${medicine.price.toStringAsFixed(2)}'),
+                          _buildDetailRow(
+                              'Quantity', '${medicine.quantity} units'),
                           _buildDetailRow('Expiry Date', medicine.expiryDate),
                           _buildDetailRow('Category', medicine.category),
                           if (medicine.canBeSell) ...[
-                            _buildDetailRow('Sell Price', '\$${medicine.priceSell.toStringAsFixed(2)}'),
-                            _buildDetailRow('Quantity To Sell', '${medicine.quantityToSell ?? 'N/A'} units'),
+                            _buildDetailRow('Sell Price',
+                                '\$${medicine.priceSell.toStringAsFixed(2)}'),
+                            _buildDetailRow('Quantity To Sell',
+                                '${medicine.quantityToSell ?? 'N/A'} units'),
                           ],
                         ],
                       ),
@@ -608,10 +708,14 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white.withOpacity(0.8)),
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.white.withOpacity(0.8)),
           ),
           const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 17, color: Colors.white)),
+          Text(value,
+              style: const TextStyle(fontSize: 17, color: Colors.white)),
           const SizedBox(height: 12),
           Divider(color: Colors.white.withOpacity(0.2)),
         ],
@@ -650,7 +754,8 @@ class _HomeScreenState extends State<HomeScreen>
                       Row(
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.menu, color: Colors.white, size: 28),
+                            icon: const Icon(Icons.menu,
+                                color: Colors.white, size: 28),
                             onPressed: () {
                               Navigator.push(
                                 context,
@@ -667,7 +772,11 @@ class _HomeScreenState extends State<HomeScreen>
                                 fontSize: 26,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
-                                shadows: [Shadow(blurRadius: 10.0, color: Color(0xFF636AE8))],
+                                shadows: [
+                                  Shadow(
+                                      blurRadius: 10.0,
+                                      color: Color(0xFF636AE8))
+                                ],
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -694,7 +803,8 @@ class _HomeScreenState extends State<HomeScreen>
                                     authViewModel.isImpersonating
                                         ? 'Exit Pharmacy'
                                         : 'Logout',
-                                    style: const TextStyle(color: Colors.white, fontSize: 8),
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 8),
                                   ),
                                 ],
                               ),
@@ -711,7 +821,9 @@ class _HomeScreenState extends State<HomeScreen>
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            shadows: [Shadow(blurRadius: 8.0, color: Color(0xFF636AE8))],
+                            shadows: [
+                              Shadow(blurRadius: 8.0, color: Color(0xFF636AE8))
+                            ],
                           ),
                         ),
                       ),
@@ -722,7 +834,9 @@ class _HomeScreenState extends State<HomeScreen>
                           children: [
                             GlowingTextField(
                               controller: _searchController,
-                              hintText: _isListening ? 'Listening...' : 'Search medicines...',
+                              hintText: _isListening
+                                  ? 'Listening...'
+                                  : 'Search medicines...',
                               onChanged: (value) {
                                 if (_selectedImage == null) {
                                   _triggerSearch(value);
@@ -741,24 +855,33 @@ class _HomeScreenState extends State<HomeScreen>
                                   ),
                                 ),
                               )
-                                  : const Icon(Icons.search, color: Color(0xFF636AE8)),
+                                  : const Icon(Icons.search,
+                                  color: Color(0xFF636AE8)),
                               suffixIcon: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (_selectedImage != null)
                                     IconButton(
-                                      icon: const Icon(Icons.close, color: Colors.white70),
+                                      icon: const Icon(Icons.close,
+                                          color: Colors.white70),
                                       onPressed: _clearImageSearch,
                                     ),
                                   IconButton(
                                     icon: Icon(
                                       Icons.mic,
-                                      color: _isListening ? Colors.redAccent : Colors.white70,
+                                      color: _isListening
+                                          ? Colors.redAccent
+                                          : Colors.white70,
                                     ),
-                                    onPressed: _speechEnabled ? (_isListening ? _stopListening : _startListening) : null,
+                                    onPressed: _speechEnabled
+                                        ? (_isListening
+                                        ? _stopListening
+                                        : _startListening)
+                                        : null,
                                   ),
                                   IconButton(
-                                    icon: const Icon(Icons.camera_alt_outlined, color: Colors.white70),
+                                    icon: const Icon(Icons.camera_alt_outlined,
+                                        color: Colors.white70),
                                     onPressed: _pickImageAndRecognizeText,
                                   ),
                                 ],
@@ -770,65 +893,123 @@ class _HomeScreenState extends State<HomeScreen>
                                 icon: Icon(
                                   _isLoadingLocation
                                       ? null
-                                      : (_isSortingByDistance ? Icons.filter_list_off_outlined : Icons.location_on_outlined),
-                                  color: _isLoadingLocation ? Colors.transparent : Colors.white,
+                                      : (_isSortingByDistance
+                                      ? Icons.filter_list_off_outlined
+                                      : Icons.location_on_outlined),
+                                  color: _isLoadingLocation
+                                      ? Colors.transparent
+                                      : Colors.white,
                                   size: 24,
                                 ),
                                 label: _isLoadingLocation
                                     ? const SizedBox(
                                   width: 24,
                                   height: 24,
-                                  child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor:
+                                      AlwaysStoppedAnimation<Color>(
+                                          Colors.white)),
                                 )
                                     : Text(
-                                  _isSortingByDistance ? "CLEAR SORT" : "SORT BY DISTANCE",
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                  _isSortingByDistance
+                                      ? "CLEAR SORT"
+                                      : "SORT BY DISTANCE",
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF636AE8).withAlpha(_isSortingByDistance ? 200: 255),
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                  backgroundColor: const Color(0xFF636AE8)
+                                      .withAlpha(
+                                      _isSortingByDistance ? 200 : 255),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 24, vertical: 14),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(15.0),
-                                      side: BorderSide(color: Colors.white.withOpacity(0.5), width: 1.0)
-                                  ),
+                                      borderRadius:
+                                      BorderRadius.circular(15.0),
+                                      side: BorderSide(
+                                          color: Colors.white.withOpacity(0.5),
+                                          width: 1.0)),
                                   elevation: 5,
-                                  shadowColor: const Color(0xFF636AE8).withOpacity(0.6),
+                                  shadowColor:
+                                  const Color(0xFF636AE8).withOpacity(0.6),
                                 ),
-                                onPressed: _isLoadingLocation ? null : () async {
-                                  final pharmacyViewModel = context.read<PharmacyViewModel>();
-                                  final medicineViewModel = context.read<MedicineViewModel>();
-                                  setState(() { _isLoadingLocation = true; });
+                                onPressed: _isLoadingLocation
+                                    ? null
+                                    : () async {
+                                  final pharmacyViewModel =
+                                  context.read<PharmacyViewModel>();
+                                  final medicineViewModel =
+                                  context.read<MedicineViewModel>();
+                                  setState(() {
+                                    _isLoadingLocation = true;
+                                  });
 
                                   if (_isSortingByDistance) {
-                                    medicineViewModel.clearDistanceSort();
-                                    setState(() { _isSortingByDistance = false; });
+                                    medicineViewModel
+                                        .clearDistanceSort();
+                                    setState(() {
+                                      _isSortingByDistance = false;
+                                    });
                                   } else {
-                                    LatLng? userLocation = await _getUserLocation();
-                                    if (userLocation != null && mounted) {
-                                      if (pharmacyViewModel.pharmacies.isEmpty) {
-                                        await pharmacyViewModel.loadPharmacies(searchQuery: '', authViewModel: authViewModel);
+                                    LatLng? userLocation =
+                                    await _getUserLocation();
+                                    if (userLocation != null &&
+                                        mounted) {
+                                      if (pharmacyViewModel
+                                          .pharmacies.isEmpty) {
+                                        await pharmacyViewModel
+                                            .loadPharmacies(
+                                            searchQuery: '',
+                                            authViewModel:
+                                            authViewModel);
                                       }
 
-                                      if (mounted && pharmacyViewModel.pharmacies.isNotEmpty) {
-                                        await medicineViewModel.sortMedicinesByDistance(userLocation, pharmacyViewModel.pharmacies);
-                                        setState(() { _isSortingByDistance = true; });
+                                      if (mounted &&
+                                          pharmacyViewModel
+                                              .pharmacies.isNotEmpty) {
+                                        await medicineViewModel
+                                            .sortMedicinesByDistance(
+                                            userLocation,
+                                            pharmacyViewModel
+                                                .pharmacies);
+                                        setState(() {
+                                          _isSortingByDistance = true;
+                                        });
                                       } else if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Could not load pharmacies for sorting.'),
-                                              backgroundColor: Colors.red,
-                                              behavior: SnackBarBehavior.fixed,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                                            ));
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'Could not load pharmacies for sorting.'),
+                                          backgroundColor: Colors.red,
+                                          behavior:
+                                          SnackBarBehavior.fixed,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                              BorderRadius.all(
+                                                  Radius.circular(
+                                                      10))),
+                                        ));
                                       }
                                     } else if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Could not get location. Please ensure location services and permissions are enabled.'),
-                                            backgroundColor: Colors.red,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                                          ));
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(const SnackBar(
+                                        content: Text(
+                                            'Could not get location. Please ensure location services and permissions are enabled.'),
+                                        backgroundColor: Colors.red,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                            BorderRadius.all(
+                                                Radius.circular(
+                                                    10))),
+                                      ));
                                     }
                                   }
-                                  setState(() { _isLoadingLocation = false; });
+                                  setState(() {
+                                    _isLoadingLocation = false;
+                                  });
                                 },
                               ),
                           ],
@@ -838,13 +1019,16 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
+              // ========== Fix Start: Reverted to SingleChildScrollView with Wrap ==========
               Expanded(
                 child: Consumer<MedicineViewModel>(
                   builder: (context, medicineViewModel, child) {
-                    if (medicineViewModel.isLoading && !_isLoadingLocation) {
+                    if (medicineViewModel.isLoading &&
+                        !medicineViewModel.isFetchingMore) {
                       return const Center(
                         child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF636AE8)),
+                          valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF636AE8)),
                         ),
                       );
                     }
@@ -861,7 +1045,8 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                             const SizedBox(height: 20),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 24.0),
                               child: Text(
                                 'Error: ${medicineViewModel.error}',
                                 style: TextStyle(
@@ -875,7 +1060,9 @@ class _HomeScreenState extends State<HomeScreen>
                             PulsingActionButton(
                               label: 'Retry',
                               onTap: () {
-                                medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: !authViewModel.isPharmacy);
+                                medicineViewModel.loadMedicines(
+                                    pharmacyId: authViewModel.activePharmacyId,
+                                    forceLoadAll: !authViewModel.isPharmacy);
                               },
                             ),
                           ],
@@ -885,7 +1072,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                     final displayedMedicines = medicineViewModel.medicines;
 
-                    if (displayedMedicines.isEmpty) {
+                    if (displayedMedicines.isEmpty &&
+                        !medicineViewModel.isFetchingMore) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -897,7 +1085,9 @@ class _HomeScreenState extends State<HomeScreen>
                             ),
                             const SizedBox(height: 20),
                             Text(
-                              _searchController.text.isNotEmpty ? 'No medicines match your search' : 'No medicines found',
+                              _searchController.text.isNotEmpty
+                                  ? 'No medicines match your search'
+                                  : 'No medicines found',
                               style: TextStyle(
                                 fontSize: 20,
                                 color: Colors.white.withOpacity(0.7),
@@ -929,29 +1119,67 @@ class _HomeScreenState extends State<HomeScreen>
                             _isSortingByDistance = false;
                           });
                         }
-                        medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId, forceLoadAll: !authViewModel.isPharmacy);
+                        await medicineViewModel.loadMedicines(
+                            pharmacyId: authViewModel.activePharmacyId,
+                            forceLoadAll: !authViewModel.isPharmacy);
                       },
                       color: const Color(0xFF636AE8),
                       backgroundColor: Colors.white.withOpacity(0.8),
                       child: SingleChildScrollView(
+                        controller: _scrollController,
                         padding: screenPadding,
-                        child: Wrap(
-                          spacing: horizontalSpacing,
-                          runSpacing: verticalSpacing,
-                          alignment: WrapAlignment.start,
-                          children: displayedMedicines.map((medicine) {
-                            final double screenWidth = MediaQuery.of(context).size.width;
-                            final double totalHorizontalPadding = screenPadding.left + screenPadding.right;
-                            final double totalSpacing = horizontalSpacing * 2;
-                            final double cardWidth = (screenWidth > 1200) ? (screenWidth - totalHorizontalPadding - totalSpacing) / 3 : (screenWidth > 800) ? (screenWidth - totalHorizontalPadding - horizontalSpacing) / 2 : (screenWidth - totalHorizontalPadding);
-                            return _buildMedicineCard(context, medicine, cardWidth);
-                          }).toList(),
+                        child: Column(
+                          children: [
+                            Wrap(
+                              spacing: horizontalSpacing,
+                              runSpacing: verticalSpacing,
+                              alignment: WrapAlignment.start,
+                              children: displayedMedicines.map((medicine) {
+                                final double screenWidth =
+                                    MediaQuery.of(context).size.width;
+                                final double totalHorizontalPadding =
+                                    screenPadding.left + screenPadding.right;
+
+                                int crossAxisCount;
+                                if (screenWidth >= 1600) {
+                                  crossAxisCount = 4;
+                                } else if (screenWidth >= 1200) {
+                                  crossAxisCount = 3;
+                                } else if (screenWidth >= 800) {
+                                  crossAxisCount = 2;
+                                } else {
+                                  crossAxisCount = 1;
+                                }
+
+                                final double totalSpacing =
+                                    horizontalSpacing * (crossAxisCount - 1);
+                                final double cardWidth = (screenWidth -
+                                    totalHorizontalPadding -
+                                    totalSpacing) /
+                                    crossAxisCount;
+
+                                return _buildMedicineCard(
+                                    context, medicine, cardWidth);
+                              }).toList(),
+                            ),
+                            if (medicineViewModel.isFetchingMore)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 20.0),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Color(0xFF636AE8)),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     );
                   },
                 ),
               ),
+              // ========== Fix End ==========
             ],
           ),
         ),
@@ -974,22 +1202,30 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       );
                       if (result == true && mounted) {
-                        medicineViewModel.loadMedicines(pharmacyId: authViewModel.activePharmacyId);
+                        medicineViewModel.loadMedicines(
+                            pharmacyId: authViewModel.activePharmacyId);
                       }
-                    } else if(mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Could not determine pharmacy to add medicine.'),
-                            backgroundColor: Colors.red,
-                            behavior: SnackBarBehavior.fixed,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10))),
-                          ));
+                    } else if (mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(const SnackBar(
+                        content: Text(
+                            'Could not determine pharmacy to add medicine.'),
+                        backgroundColor: Colors.red,
+                        behavior: SnackBarBehavior.fixed,
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                            BorderRadius.all(Radius.circular(10))),
+                      ));
                     }
                   },
                   backgroundColor: const Color(0xFF636AE8),
                   foregroundColor: Colors.white,
                   icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('Add Medicine', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                  label: const Text('Add Medicine',
+                      style: TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30)),
                   elevation: 8,
                 ),
               ),
@@ -1001,14 +1237,16 @@ class _HomeScreenState extends State<HomeScreen>
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const ChatAiScreen()),
+                    MaterialPageRoute(
+                        builder: (context) => const ChatAiScreen()),
                   );
                 },
                 backgroundColor: const Color(0xFF4CAF50),
                 foregroundColor: Colors.white,
                 tooltip: 'Chat with AI',
                 child: const Icon(Icons.support_agent, color: Colors.white),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30)),
                 elevation: 8,
               ),
             ),

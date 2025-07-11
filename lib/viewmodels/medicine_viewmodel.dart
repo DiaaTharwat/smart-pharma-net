@@ -1,4 +1,4 @@
-// lib/viewmodels/medicine_viewmodel.dart
+// lib/viewmodels/medicine_view_model.dart
 
 import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
@@ -17,30 +17,52 @@ class MedicineViewModel extends ChangeNotifier {
 
   String _lastSearchQuery = '';
 
+  int _currentPage = 1;
+  bool _hasNextPage = true;
+  bool _isFetchingMore = false;
+
   MedicineViewModel(this._medicineRepository, this._pharmacyRepository);
 
   List<MedicineModel> get medicines => _medicines;
   bool get isLoading => _isLoading;
   String get error => _error;
 
-  List<String> get allMedicineNames => _originalMedicinesList.map((med) => med.name).toList();
+  // ========== ✅ Fix Start: Added public getter for isFetchingMore ==========
+  bool get isFetchingMore => _isFetchingMore;
+  // ========== ✅ Fix End ==========
 
-  Future<void> loadMedicines({String? pharmacyId, bool forceLoadAll = false}) async {
+  List<String> get allMedicineNames =>
+      _originalMedicinesList.map((med) => med.name).toList();
+
+  Future<void> loadMedicines(
+      {String? pharmacyId, bool forceLoadAll = false}) async {
     _isLoading = true;
     _error = '';
     _lastSearchQuery = '';
     notifyListeners();
 
     try {
-      List<MedicineModel> fetchedMedicines;
-      if (pharmacyId != null && !forceLoadAll) {
-        fetchedMedicines = await _medicineRepository.getMedicinesForPharmacy(pharmacyId);
-      } else {
-        fetchedMedicines = await _medicineRepository.getAllMedicines();
-      }
-      _medicines = fetchedMedicines.map((m) => m.copyWith(distance: null)).toList();
-      _originalMedicinesList = List.from(_medicines);
+      _currentPage = 1;
+      _hasNextPage = true;
+      _medicines.clear();
+      _originalMedicinesList.clear();
 
+      if (pharmacyId != null && !forceLoadAll) {
+        final fetchedMedicines =
+        await _medicineRepository.getMedicinesForPharmacy(pharmacyId);
+        _medicines =
+            fetchedMedicines.map((m) => m.copyWith(distance: null)).toList();
+        _originalMedicinesList = List.from(_medicines);
+        _hasNextPage = false;
+      } else {
+        final response =
+        await _medicineRepository.getAllMedicines(page: _currentPage);
+        final fetchedMedicines = response['medicines'] as List<MedicineModel>;
+        _medicines =
+            fetchedMedicines.map((m) => m.copyWith(distance: null)).toList();
+        _originalMedicinesList = List.from(_medicines);
+        _hasNextPage = response['next'] != null;
+      }
     } catch (e) {
       _error = e.toString();
       print("Error loading medicines: $_error");
@@ -50,46 +72,81 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  // -- MODIFIED --: This method is kept for potential other uses.
+  Future<void> loadMoreMedicines() async {
+    if (_isFetchingMore || !_hasNextPage) return;
+
+    _isFetchingMore = true;
+    notifyListeners();
+
+    try {
+      _currentPage++;
+      final Map<String, dynamic> response;
+      if (_lastSearchQuery.isNotEmpty) {
+        response = await _medicineRepository.searchMedicines(_lastSearchQuery,
+            page: _currentPage);
+      } else {
+        response = await _medicineRepository.getAllMedicines(page: _currentPage);
+      }
+
+      final newMedicines = response['medicines'] as List<MedicineModel>;
+      _medicines.addAll(newMedicines.map((m) => m.copyWith(distance: null)));
+      _originalMedicinesList.addAll(List.from(newMedicines));
+
+      _hasNextPage = response['next'] != null;
+    } catch (e) {
+      print("Error loading more medicines: $e");
+      _currentPage--;
+    } finally {
+      _isFetchingMore = false;
+      notifyListeners();
+    }
+  }
+
   void removeMedicineById(String medicineId) {
-    _originalMedicinesList.removeWhere((medicine) => medicine.id == medicineId);
+    _originalMedicinesList
+        .removeWhere((medicine) => medicine.id == medicineId);
     _medicines.removeWhere((medicine) => medicine.id == medicineId);
     notifyListeners();
   }
 
-  // -- ADDED --: New, more robust method to remove a medicine by a composite key.
-  // This ensures the correct medicine is removed from the home screen.
-  void removeMedicineByNameAndPharmacy({required String name, required String pharmacyId}) {
-    _originalMedicinesList.removeWhere((med) => med.name == name && med.pharmacyId == pharmacyId);
-    _medicines.removeWhere((med) => med.name == name && med.pharmacyId == pharmacyId);
+  void removeMedicineByNameAndPharmacy(
+      {required String name, required String pharmacyId}) {
+    _originalMedicinesList
+        .removeWhere((med) => med.name == name && med.pharmacyId == pharmacyId);
+    _medicines
+        .removeWhere((med) => med.name == name && med.pharmacyId == pharmacyId);
     notifyListeners();
   }
 
-  // ========== Fix Start: Updated search logic to call the API ==========
   Future<void> searchMedicines(String query, {String? pharmacyId}) async {
     _isLoading = true;
     _error = '';
     _lastSearchQuery = query;
     notifyListeners();
+
     try {
+      _currentPage = 1;
+      _hasNextPage = true;
+      _medicines.clear();
+
       if (query.isEmpty) {
-        // If the query is empty, load the initial full list of medicines.
         await loadMedicines(forceLoadAll: true);
       } else {
-        // Otherwise, call the repository to search for medicines via the API.
-        final fetchedMedicines = await _medicineRepository.searchMedicines(query);
-        _medicines = fetchedMedicines.map((m) => m.copyWith(distance: null)).toList();
+        final response =
+        await _medicineRepository.searchMedicines(query, page: _currentPage);
+        final fetchedMedicines = response['medicines'] as List<MedicineModel>;
+        _medicines =
+            fetchedMedicines.map((m) => m.copyWith(distance: null)).toList();
+        _hasNextPage = response['next'] != null;
       }
     } catch (e) {
       _error = e.toString();
-      _medicines = []; // Clear medicines list on error
+      _medicines = [];
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
-  // ========== Fix End ==========
-
 
   Future<bool> addMedicine({
     required String name,
@@ -122,9 +179,7 @@ class MedicineViewModel extends ChangeNotifier {
       };
 
       await _medicineRepository.addMedicine(
-          medicineData: medicineData,
-          pharmacyId: pharmacyId
-      );
+          medicineData: medicineData, pharmacyId: pharmacyId);
 
       await loadMedicines(pharmacyId: pharmacyId);
       _isLoading = false;
@@ -172,8 +227,7 @@ class MedicineViewModel extends ChangeNotifier {
       await _medicineRepository.updateMedicine(
           pharmacyId: pharmacyId,
           medicineId: medicineId,
-          medicineData: medicineData
-      );
+          medicineData: medicineData);
 
       _isLoading = false;
       notifyListeners();
@@ -186,10 +240,12 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> deleteMedicine({required String pharmacyId, required String medicineId}) async {
+  Future<void> deleteMedicine(
+      {required String pharmacyId, required String medicineId}) async {
     _error = '';
     try {
-      await _medicineRepository.deleteMedicine(pharmacyId: pharmacyId, medicineId: medicineId);
+      await _medicineRepository.deleteMedicine(
+          pharmacyId: pharmacyId, medicineId: medicineId);
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -205,7 +261,8 @@ class MedicineViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> sortMedicinesByDistance(LatLng userLocation, List<PharmacyModel> allPharmacies) async {
+  Future<void> sortMedicinesByDistance(
+      LatLng userLocation, List<PharmacyModel> allPharmacies) async {
     _isLoading = true;
     _error = '';
     notifyListeners();
@@ -213,7 +270,8 @@ class MedicineViewModel extends ChangeNotifier {
     try {
       if (allPharmacies.isEmpty) {
         _error = "No pharmacies available to sort by distance.";
-        _medicines = List.from(_medicines.map((m) => m.copyWith(distance: null)));
+        _medicines =
+            List.from(_medicines.map((m) => m.copyWith(distance: null)));
         notifyListeners();
         return;
       }
@@ -229,7 +287,9 @@ class MedicineViewModel extends ChangeNotifier {
       for (var med in medicinesToSort) {
         PharmacyModel? pharmacy = pharmacyMap[med.pharmacyId];
         double? calculatedDistance;
-        if (pharmacy != null && pharmacy.latitude != 0.0 && pharmacy.longitude != 0.0) {
+        if (pharmacy != null &&
+            pharmacy.latitude != 0.0 &&
+            pharmacy.longitude != 0.0) {
           calculatedDistance = distanceCalculator.as(
             LengthUnit.Meter,
             userLocation,
@@ -248,10 +308,10 @@ class MedicineViewModel extends ChangeNotifier {
         return a.distance!.compareTo(b.distance!);
       });
       _medicines = processedMedicines;
-
     } catch (e) {
       _error = "Error sorting medicines by distance: ${e.toString()}";
-      _medicines = List.from(_medicines.map((m) => m.copyWith(distance: null)));
+      _medicines =
+          List.from(_medicines.map((m) => m.copyWith(distance: null)));
       print(_error);
     } finally {
       _isLoading = false;
@@ -263,8 +323,7 @@ class MedicineViewModel extends ChangeNotifier {
     if (_lastSearchQuery.isNotEmpty) {
       searchMedicines(_lastSearchQuery);
     } else {
-      _medicines = List.from(_originalMedicinesList.map((m) => m.copyWith(distance: null)));
+      loadMedicines(forceLoadAll: true);
     }
-    notifyListeners();
   }
 }

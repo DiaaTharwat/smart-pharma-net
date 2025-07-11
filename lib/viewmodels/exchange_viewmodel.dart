@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // ✨ إضافة مهمة: لاستخدام Provider
+import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/models/exchange_medicine_model.dart';
 import 'package:smart_pharma_net/repositories/exchange_repository.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
@@ -11,8 +11,6 @@ class ExchangeViewModel extends BaseViewModel {
   final ExchangeRepository _exchangeRepository;
   final AuthViewModel _authViewModel;
   final MedicineViewModel _medicineViewModel;
-  // ✨ تم حذف الاعتمادية على DashboardViewModel من هنا لتجنب الخطأ
-  // final DashboardViewModel _dashboardViewModel;
 
   List<ExchangeMedicineModel> _exchangeMedicines = [];
   List<ExchangeMedicineModel> _originalExchangeMedicines = [];
@@ -21,13 +19,19 @@ class ExchangeViewModel extends BaseViewModel {
   bool _exchangeOrderPlacedSuccessfully = false;
   bool get exchangeOrderPlacedSuccessfully => _exchangeOrderPlacedSuccessfully;
 
-  // ✨ تحديث الـ Constructor: تم حذف DashboardViewModel
+  int _currentPage = 1;
+  bool _hasNextPage = true;
+  bool _isFetchingMore = false;
+
   ExchangeViewModel(
       this._exchangeRepository,
       this._authViewModel,
       this._medicineViewModel,
-      // this._dashboardViewModel // لم نعد بحاجة إليه هنا
       );
+
+  // ========== ✅ Fix Start: Added public getter for isFetchingMore ==========
+  bool get isFetchingMore => _isFetchingMore;
+  // ========== ✅ Fix End ==========
 
   List<ExchangeMedicineModel> get exchangeMedicines => _exchangeMedicines;
 
@@ -38,12 +42,51 @@ class ExchangeViewModel extends BaseViewModel {
     setLoading(true);
     setError(null);
     try {
-      _originalExchangeMedicines = await _exchangeRepository.getExchangeList();
+      _currentPage = 1;
+      _hasNextPage = true;
+
+      final response =
+      await _exchangeRepository.getExchangeList(page: _currentPage);
+      final fetchedMedicines =
+      response['medicines'] as List<ExchangeMedicineModel>;
+
+      _originalExchangeMedicines = fetchedMedicines;
+      _hasNextPage = response['next'] != null;
+
       applySearchFilter(_searchQuery);
     } catch (e) {
       setError(e.toString());
     } finally {
       setLoading(false);
+    }
+  }
+
+  Future<void> loadMoreExchangeMedicines() async {
+    if (_isFetchingMore || !_hasNextPage || _searchQuery.isNotEmpty) return;
+
+    _isFetchingMore = true;
+    notifyListeners();
+
+    try {
+      _currentPage++;
+      final response =
+      await _exchangeRepository.getExchangeList(page: _currentPage);
+      final newMedicines =
+      response['medicines'] as List<ExchangeMedicineModel>;
+
+      _originalExchangeMedicines.addAll(newMedicines);
+      _exchangeMedicines.addAll(newMedicines.where((med) {
+        final int? quantity = int.tryParse(med.medicineQuantityToSell);
+        return quantity != null && quantity > 0;
+      }));
+
+      _hasNextPage = response['next'] != null;
+    } catch (e) {
+      print("Error loading more exchange medicines: $e");
+      _currentPage--;
+    } finally {
+      _isFetchingMore = false;
+      notifyListeners();
     }
   }
 
@@ -72,9 +115,8 @@ class ExchangeViewModel extends BaseViewModel {
     notifyListeners();
   }
 
-  // ✨ جوهر الإصلاح: إضافة BuildContext للدالة للحصول على Provider محدث
   Future<void> createBuyOrder({
-    required BuildContext context, // ✨ إضافة مهمة جداً
+    required BuildContext context,
     required String medicineId,
     required String medicineName,
     required String price,
@@ -126,8 +168,6 @@ class ExchangeViewModel extends BaseViewModel {
         recieveDate: recieveDate,
       );
 
-      // ✨ جوهر الإصلاح: استدعاء DashboardViewModel بشكل آمن باستخدام context
-      // هذا يضمن أننا نستخدم نسخة حية وغير محذوفة
       Provider.of<DashboardViewModel>(context, listen: false)
           .fetchDashboardStats();
 

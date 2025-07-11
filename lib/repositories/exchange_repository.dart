@@ -7,25 +7,27 @@ class ExchangeRepository {
 
   ExchangeRepository(this._apiService);
 
-  // Fetches medicines available for exchange from other pharmacies
-  Future<List<ExchangeMedicineModel>> getExchangeList() async {
+  // ========== Fix Start: Updated to handle paginated response ==========
+  // The function now accepts a page number and returns a Map containing
+  // the list of exchangeable medicines and the URL for the next page.
+  Future<Map<String, dynamic>> getExchangeList({int page = 1}) async {
     try {
-      print('Fetching exchange list from backend...');
-      final response =
-      await _apiService.authenticatedGet('exchange/exchange_list/');
+      final endpoint = 'exchange/exchange_list/?page=$page';
+      print('Fetching exchange list from backend for page: $page...');
+      final response = await _apiService.authenticatedGet(endpoint);
 
-      // The new Swagger spec returns a paginated response object, not a direct list.
-      // We need to extract the 'results' list from it.
+      // The new Swagger spec returns a paginated response object.
       if (response is Map<String, dynamic> && response.containsKey('results')) {
         final results = response['results'] as List;
-        return results
+        final exchangeList = results
             .map((json) => ExchangeMedicineModel.fromJson(json))
             .toList();
-      } else if (response is List) {
-        // Fallback for the old format, just in case.
-        return response
-            .map((json) => ExchangeMedicineModel.fromJson(json))
-            .toList();
+
+        // Return the full map so the ViewModel knows about the next page.
+        return {
+          'medicines': exchangeList,
+          'next': response['next'],
+        };
       }
       throw Exception('Invalid response format for exchange list');
     } catch (e) {
@@ -33,6 +35,7 @@ class ExchangeRepository {
       rethrow;
     }
   }
+  // ========== Fix End ==========
 
   // Sends a buy order for a medicine to another pharmacy
   // -- ✨ تم التصحيح النهائي والكامل ✨ --

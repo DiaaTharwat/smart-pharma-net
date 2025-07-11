@@ -38,15 +38,24 @@ class _ExchangeScreenState extends State<ExchangeScreen>
   bool _isListening = false;
   File? _selectedImage;
   final TextRecognizer _textRecognizer = TextRecognizer();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
     _initSpeech();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkPharmacyAccessAndLoadMedicines();
     });
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      context.read<ExchangeViewModel>().loadMoreExchangeMedicines();
+    }
   }
 
   void _setupAnimations() {
@@ -212,6 +221,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
     _controller.dispose();
     _textRecognizer.close();
     _speechToText.cancel();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -277,7 +288,6 @@ class _ExchangeScreenState extends State<ExchangeScreen>
           body: InteractiveParticleBackground(
             child: Consumer<ExchangeViewModel>(
               builder: (context, exchangeViewModel, child) {
-                // This logic was moved to the createBuyOrder method to be more reliable
                 return Column(
                   children: [
                     Container(
@@ -413,7 +423,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                     Expanded(
                       child: Builder(
                         builder: (context) {
-                          if (exchangeViewModel.isLoading) {
+                          if (exchangeViewModel.isLoading &&
+                              !exchangeViewModel.isFetchingMore) {
                             return const Center(
                               child: CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(
@@ -456,7 +467,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                           final displayedMedicines =
                               exchangeViewModel.exchangeMedicines;
 
-                          if (displayedMedicines.isEmpty) {
+                          if (displayedMedicines.isEmpty &&
+                              !exchangeViewModel.isFetchingMore) {
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -509,34 +521,57 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                             color: const Color(0xFF636AE8),
                             backgroundColor: Colors.white.withOpacity(0.8),
                             child: SingleChildScrollView(
+                              controller: _scrollController,
                               padding: screenPadding,
-                              child: Wrap(
-                                spacing: horizontalSpacing,
-                                runSpacing: verticalSpacing,
-                                alignment: WrapAlignment.start,
-                                children: displayedMedicines.map((medicine) {
-                                  final double screenWidth =
-                                      MediaQuery.of(context).size.width;
-                                  final double totalHorizontalPadding =
-                                      screenPadding.left + screenPadding.right;
-                                  final double totalSpacing =
-                                      horizontalSpacing * 2;
-                                  final double cardWidth = (screenWidth >
-                                      1200)
-                                      ? (screenWidth -
-                                      totalHorizontalPadding -
-                                      totalSpacing) /
-                                      3
-                                      : (screenWidth > 800)
-                                      ? (screenWidth -
-                                      totalHorizontalPadding -
-                                      horizontalSpacing) /
-                                      2
-                                      : (screenWidth -
-                                      totalHorizontalPadding);
-                                  return _buildExchangeMedicineCard(
-                                      medicine, cardWidth);
-                                }).toList(),
+                              child: Column(
+                                children: [
+                                  Wrap(
+                                    spacing: horizontalSpacing,
+                                    runSpacing: verticalSpacing,
+                                    alignment: WrapAlignment.start,
+                                    children:
+                                    displayedMedicines.map((medicine) {
+                                      final double screenWidth =
+                                          MediaQuery.of(context).size.width;
+                                      final double totalHorizontalPadding =
+                                          screenPadding.left +
+                                              screenPadding.right;
+
+                                      int crossAxisCount;
+                                      if (screenWidth >= 1600) {
+                                        crossAxisCount = 4;
+                                      } else if (screenWidth >= 1200) {
+                                        crossAxisCount = 3;
+                                      } else if (screenWidth >= 800) {
+                                        crossAxisCount = 2;
+                                      } else {
+                                        crossAxisCount = 1;
+                                      }
+
+                                      final double totalSpacing =
+                                          horizontalSpacing *
+                                              (crossAxisCount - 1);
+                                      final double cardWidth = (screenWidth -
+                                          totalHorizontalPadding -
+                                          totalSpacing) /
+                                          crossAxisCount;
+                                      return _buildExchangeMedicineCard(
+                                          medicine, cardWidth);
+                                    }).toList(),
+                                  ),
+                                  if (exchangeViewModel.isFetchingMore)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          vertical: 20.0),
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          valueColor:
+                                          AlwaysStoppedAnimation<Color>(
+                                              Color(0xFF636AE8)),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           );
@@ -954,7 +989,8 @@ class _ExchangeScreenState extends State<ExchangeScreen>
                       label: 'Confirm Order',
                       onTap: () async {
                         if (selectedDate == null) {
-                          ScaffoldMessenger.of(modalContext).showSnackBar( // Use modalContext
+                          ScaffoldMessenger.of(modalContext).showSnackBar(
+                            // Use modalContext
                             const SnackBar(
                               content: Text(
                                   'Please select an expected receive date.'),
