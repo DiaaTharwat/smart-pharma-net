@@ -26,6 +26,12 @@ class _PharmacyOrdersScreenState extends State<PharmacyOrdersScreen>
     super.initState();
     _setupAnimations();
     _loadOrders();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<OrderViewModel>().markOrdersAsViewed();
+      }
+    });
   }
 
   void _setupAnimations() {
@@ -52,11 +58,8 @@ class _PharmacyOrdersScreenState extends State<PharmacyOrdersScreen>
   }
 
   Future<void> _loadOrders() async {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<OrderViewModel>().loadIncomingOrders();
-      }
-    });
+    final orderViewModel = context.read<OrderViewModel>();
+    await orderViewModel.loadIncomingOrders();
   }
 
   @override
@@ -146,52 +149,16 @@ class _PharmacyOrdersScreenState extends State<PharmacyOrdersScreen>
     final orderViewModel = context.read<OrderViewModel>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
-        content: Text('Updating order status to $newStatus...'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: Colors.blueAccent,
-        behavior: SnackBarBehavior.floating,
-        shape:
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-
     try {
-      final success =
+      // =================== START: CORRECTION ===================
+      // The method name is corrected here
       await orderViewModel.updateOrderStatus(context, orderId, newStatus);
-
-      scaffoldMessenger.hideCurrentSnackBar();
-
-      if (success && mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('Order status updated successfully!'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(10))),
-          ),
-        );
-        // No need to call _loadOrders() again.
-        // The ViewModel's notifyListeners() handles the UI update.
-      } else if (!success && mounted) {
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('Failed to update order status. Please try again.'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(10))),
-          ),
-        );
-      }
+      // =================== END: CORRECTION ===================
     } catch (e) {
-      scaffoldMessenger.hideCurrentSnackBar();
       if (mounted) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text('An error occurred: ${e.toString()}'),
+            content: Text('Failed to update order: ${e.toString()}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             shape: const RoundedRectangleBorder(
@@ -201,6 +168,7 @@ class _PharmacyOrdersScreenState extends State<PharmacyOrdersScreen>
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +277,7 @@ class _PharmacyOrdersScreenState extends State<PharmacyOrdersScreen>
             Expanded(
               child: Consumer<OrderViewModel>(
                 builder: (context, viewModel, _) {
-                  if (viewModel.isLoading) {
+                  if (viewModel.isLoading && viewModel.incomingOrders.isEmpty) {
                     return const Center(
                       child: CircularProgressIndicator(
                         valueColor:
@@ -402,7 +370,9 @@ class _PharmacyOrdersScreenState extends State<PharmacyOrdersScreen>
     final Color shadowColor =
     _getStatusBackgroundColor(order.status).withOpacity(0.15);
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
         color: const Color(0xFF0F0F1A),

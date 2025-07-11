@@ -19,6 +19,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:string_similarity/string_similarity.dart';
+import 'package:flutter_map/flutter_map.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -378,6 +379,81 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  void _showMapDialog(String pharmacyName, String? lat, String? lon) {
+    if (lat == null || lon == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Location not available for this pharmacy.")),
+      );
+      return;
+    }
+    final double? latitude = double.tryParse(lat);
+    final double? longitude = double.tryParse(lon);
+
+    if (latitude == null || longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Invalid location data for this pharmacy.")),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: const Color(0xFF636AE8).withOpacity(0.5)),
+        ),
+        title: Text(
+          pharmacyName,
+          style:
+          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: FlutterMap(
+            options: MapOptions(
+              initialCenter: LatLng(latitude, longitude),
+              initialZoom: 15.0,
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.smart_pharma_net',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    width: 80.0,
+                    height: 80.0,
+                    point: LatLng(latitude, longitude),
+                    child: const Icon(
+                      Icons.location_pin,
+                      color: Colors.redAccent,
+                      size: 40.0,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            child:
+            const Text('Close', style: TextStyle(color: Color(0xFF636AE8))),
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMedicineCard(
       BuildContext context, MedicineModel medicine, double cardWidth) {
     final authViewModel = context.watch<AuthViewModel>();
@@ -491,6 +567,8 @@ class _HomeScreenState extends State<HomeScreen>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
+
+                        // >>>>>>>> THIS IS THE CORRECTED CODE BLOCK <<<<<<<<
                         if (!authViewModel.isPharmacy)
                           Row(
                             children: [
@@ -499,14 +577,52 @@ class _HomeScreenState extends State<HomeScreen>
                                   color: Colors.white.withOpacity(0.7)),
                               const SizedBox(width: 4),
                               Expanded(
-                                  child: Text(medicine.pharmacyName,
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          color:
-                                          Colors.white.withOpacity(0.7)),
-                                      overflow: TextOverflow.ellipsis)),
+                                child: Text(
+                                  medicine.pharmacyName,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white.withOpacity(0.7)),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              InkWell(
+                                onTap: () {
+                                  // Find the pharmacy in the view model list
+                                  final pharmacyViewModel =
+                                  context.read<PharmacyViewModel>();
+                                  PharmacyModel? pharmacy;
+                                  try {
+                                    pharmacy = pharmacyViewModel.pharmacies
+                                        .firstWhere((p) =>
+                                    p.id == medicine.pharmacyId);
+                                  } catch (e) {
+                                    pharmacy = null; // Pharmacy not found
+                                  }
+
+                                  if (pharmacy != null) {
+                                    _showMapDialog(
+                                      pharmacy.name,
+                                      // >>>>>>>> FIX APPLIED HERE <<<<<<<<
+                                      pharmacy.latitude.toString(),
+                                      pharmacy.longitude.toString(),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                          content: Text(
+                                              "Location details for this pharmacy are not available.")),
+                                    );
+                                  }
+                                },
+                                child: const Icon(Icons.location_on_outlined,
+                                    size: 16, color: Color(0xFF636AE8)),
+                              ),
                             ],
                           ),
+                        // >>>>>>>> END OF CORRECTION <<<<<<<<
+
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -1019,7 +1135,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-              // ========== Fix Start: Reverted to SingleChildScrollView with Wrap ==========
               Expanded(
                 child: Consumer<MedicineViewModel>(
                   builder: (context, medicineViewModel, child) {
@@ -1179,7 +1294,6 @@ class _HomeScreenState extends State<HomeScreen>
                   },
                 ),
               ),
-              // ========== Fix End ==========
             ],
           ),
         ),

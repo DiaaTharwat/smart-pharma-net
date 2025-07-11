@@ -2,7 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart'; // ✨ إضافة مهمة
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_pharma_net/models/order_model.dart';
 import 'package:smart_pharma_net/models/important_notification_model.dart';
@@ -14,42 +14,87 @@ import 'package:smart_pharma_net/viewmodels/dashboard_viewmodel.dart';
 class OrderViewModel extends BaseViewModel {
   final OrderRepository _orderRepository;
   final AuthViewModel _authViewModel;
-  // ✨ تم حذف الاعتمادية على DashboardViewModel من هنا
-  // final DashboardViewModel _dashboardViewModel;
 
   List<OrderModel> _incomingOrders = [];
   List<ImportantNotificationModel> _importantNotifications = [];
   int _unreadNotificationCount = 0;
   String? _lastReadNotificationTimestamp;
+  int _badgeCount = 0;
+
+  String? _lastViewedOrderTimestamp;
 
   bool _isDisposed = false;
   Timer? _notificationTimer;
 
   static const String _lastReadTimestampKey = 'lastReadNotificationTimestamp';
+  // =================== START: MODIFICATION 1 (NEW KEY) ===================
+  // مفتاح جديد لتخزين تاريخ آخر طلب بشكل دائم
+  static const String _lastViewedOrderTimestampKey = 'lastViewedOrderTimestamp';
+  // =================== END: MODIFICATION 1 ===================
 
-  // ✨ تحديث الـ Constructor: تم حذف DashboardViewModel
   OrderViewModel(this._orderRepository, this._authViewModel) {
     _loadLastReadTimestamp();
+    // =================== START: MODIFICATION 2 (CALL NEW FUNCTION) ===================
+    // عند بدء التشغيل، نقوم بتحميل التاريخ المحفوظ
+    _loadLastViewedOrderTimestamp();
+    // =================== END: MODIFICATION 2 ===================
     _startPollingForNotifications();
   }
 
-  // =================== Getters and Data Management ===================
+  // Getters and Data Management
   List<OrderModel> get incomingOrders => _incomingOrders;
-  List<ImportantNotificationModel> get importantNotifications =>
-      _importantNotifications;
-
+  List<ImportantNotificationModel> get importantNotifications => _importantNotifications;
   int get pendingOrdersCount =>
       _incomingOrders.where((order) => order.status == 'Pending').length;
-
   int get importantNotificationsCount => _unreadNotificationCount;
+  int get incomingOrdersCount => _badgeCount;
 
-  int get incomingOrdersCount => _incomingOrders.length;
+  // =================== START: MODIFICATION 3 (NEW FUNCTION TO LOAD) ===================
+  /// وظيفة جديدة لتحميل التاريخ المحفوظ من ذاكرة الهاتف عند بدء التشغيل
+  Future<void> _loadLastViewedOrderTimestamp() async {
+    final prefs = await SharedPreferences.getInstance();
+    _lastViewedOrderTimestamp = prefs.getString(_lastViewedOrderTimestampKey);
+    print("Loaded last viewed order timestamp: $_lastViewedOrderTimestamp");
+  }
+  // =================== END: MODIFICATION 3 ===================
 
-  void clearOrders() {
+
+  // =================== START: MODIFICATION 4 (SAVE TO STORAGE) ===================
+  /// الآن، هذه الدالة ستقوم بحفظ التاريخ بشكل دائم
+  void markOrdersAsViewed() async { // Make it async
+    if (_incomingOrders.isNotEmpty) {
+      _incomingOrders.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+      _lastViewedOrderTimestamp = _incomingOrders.first.createdAt;
+
+      // حفظ التاريخ في الذاكرة الدائمة
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastViewedOrderTimestampKey, _lastViewedOrderTimestamp!);
+
+      print("Orders viewed. Last timestamp recorded and SAVED: $_lastViewedOrderTimestamp");
+    }
+    _badgeCount = 0;
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+  // =================== END: MODIFICATION 4 ===================
+
+
+  // =================== START: MODIFICATION 5 (CLEAR FROM STORAGE) ===================
+  /// عند مسح الطلبات، نمسح التاريخ المحفوظ أيضًا
+  void clearOrders() async { // Make it async
     _incomingOrders = [];
-    print("Local orders cleared.");
+    _badgeCount = 0;
+    _lastViewedOrderTimestamp = null;
+
+    // مسح التاريخ من الذاكرة الدائمة
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_lastViewedOrderTimestampKey);
+
+    print("Local orders and saved timestamp cleared.");
     notifyListeners();
   }
+  // =================== END: MODIFICATION 5 ===================
 
   void clearNotifications() {
     _importantNotifications = [];
@@ -57,11 +102,9 @@ class OrderViewModel extends BaseViewModel {
     print("Local notifications cleared.");
     notifyListeners();
   }
-  // =================================================================
 
   void _startPollingForNotifications() {
     _notificationTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      print("Polling for new notifications...");
       if (!_isDisposed) {
         loadImportantNotifications();
       } else {
@@ -82,6 +125,7 @@ class OrderViewModel extends BaseViewModel {
     _lastReadNotificationTimestamp = prefs.getString(_lastReadTimestampKey);
   }
 
+  /// هذا الكود الآن سيعمل بشكل صحيح لأنه يعتمد على التاريخ المحفوظ
   Future<void> loadIncomingOrders() async {
     if (_isDisposed) return;
     setLoading(true);
@@ -91,12 +135,35 @@ class OrderViewModel extends BaseViewModel {
       final pharmacyId = await _authViewModel.getPharmacyId();
       if (pharmacyId == null) {
         _incomingOrders = [];
+        _badgeCount = 0;
         if (!_isDisposed) setLoading(false);
         return;
       }
 
-      _incomingOrders =
+      final newOrderList =
       await _orderRepository.getIncomingOrdersForSeller(pharmacyId: pharmacyId);
+
+      // هنا يتم استخدام التاريخ المحفوظ بشكل صحيح
+      if (_lastViewedOrderTimestamp != null) {
+        try {
+          final lastViewedDate = DateTime.parse(_lastViewedOrderTimestamp!);
+          _badgeCount = newOrderList.where((order) {
+            try {
+              if (order.createdAt == null) return false;
+              final orderDate = DateTime.parse(order.createdAt!);
+              return orderDate.isAfter(lastViewedDate);
+            } catch (e) {
+              return false;
+            }
+          }).length;
+        } catch (e) {
+          _badgeCount = newOrderList.length;
+        }
+      } else {
+        _badgeCount = newOrderList.length;
+      }
+
+      _incomingOrders = newOrderList;
 
       _incomingOrders.sort((a, b) {
         if (a.status == 'Pending' && b.status != 'Pending') return -1;
@@ -112,7 +179,6 @@ class OrderViewModel extends BaseViewModel {
 
   Future<void> loadImportantNotifications() async {
     if (_isDisposed) return;
-    // لا نستخدم setLoading هنا لتجنب وميض الواجهة
     setError(null);
     try {
       final pharmacyId = await _authViewModel.getPharmacyId();
@@ -169,40 +235,43 @@ class OrderViewModel extends BaseViewModel {
     if (!_isDisposed) notifyListeners();
   }
 
-  // ✨✨✨ جوهر الإصلاح هنا ✨✨✨
-  Future<bool> updateOrderStatus(BuildContext context, String orderId, String newStatus) async {
-    setError(null);
+  Future<void> updateOrderStatus(BuildContext context, String orderId, String newStatus) async {
+    if (_isDisposed) return;
+
     final int orderIndex =
     _incomingOrders.indexWhere((order) => order.id.toString() == orderId);
     if (orderIndex == -1) {
-      setError("Order not found locally.");
-      return false;
+      final error = "Order not found locally.";
+      setError(error);
+      notifyListeners();
+      throw Exception(error);
     }
     final OrderModel originalOrder = _incomingOrders[orderIndex];
 
+    _incomingOrders[orderIndex] = originalOrder.copyWith(status: newStatus);
+    _incomingOrders.sort((a, b) {
+      if (a.status == 'Pending' && b.status != 'Pending') return -1;
+      if (a.status != 'Pending' && b.status == 'Pending') return 1;
+      return (b.createdAt ?? '').compareTo(a.createdAt ?? '');
+    });
+    notifyListeners();
+
     try {
       await _orderRepository.updateOrderStatus(orderId, newStatus);
-      _incomingOrders[orderIndex] = originalOrder.copyWith(status: newStatus);
-      _incomingOrders.sort((a, b) {
-        if (a.status == 'Pending' && b.status != 'Pending') return -1;
-        if (a.status != 'Pending' && b.status == 'Pending') return 1;
-        return (b.createdAt ?? '').compareTo(a.createdAt ?? '');
-      });
-
-      // ✨ استدعاء DashboardViewModel بشكل آمن باستخدام context
       Provider.of<DashboardViewModel>(context, listen: false).fetchDashboardStats();
-
       await loadImportantNotifications();
-
-      if (!_isDisposed) notifyListeners();
-      return true;
     } catch (e) {
-      _incomingOrders[orderIndex] = originalOrder;
       if (!_isDisposed) {
+        _incomingOrders[orderIndex] = originalOrder;
+        _incomingOrders.sort((a, b) {
+          if (a.status == 'Pending' && b.status != 'Pending') return -1;
+          if (a.status != 'Pending' && b.status == 'Pending') return 1;
+          return (b.createdAt ?? '').compareTo(a.createdAt ?? '');
+        });
         setError("Failed to update status: ${e.toString()}");
         notifyListeners();
       }
-      return false;
+      throw e;
     }
   }
 }
