@@ -1,8 +1,9 @@
 // lib/view/Screens/home_screen.dart
+
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart'; // ✨ استيراد الحزمة الجديدة
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -165,23 +166,30 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
+  // =========================================================================
+  // =================== START: الكود الذي تم تعديله =======================
+  // =========================================================================
+  /// The final, correct implementation for image search on the HomeScreen.
   void _pickImageAndRecognizeText() async {
     final medicineViewModel = context.read<MedicineViewModel>();
 
-    if (medicineViewModel.allMedicineNames.isEmpty) {
+    // Use the currently loaded medicines as a guide for string matching.
+    // This list is incomplete but serves as an excellent filter.
+    final List<String> localMedicineNames = medicineViewModel.medicines.map((m) => m.name).toList();
+
+    if (localMedicineNames.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text(
-                "Medicine list is not loaded yet. Please try again in a moment.")),
+                "Medicine list is empty. Please wait for it to load.")),
       );
       return;
     }
 
     try {
+      // 1. Pick Image
       final ImagePicker picker = ImagePicker();
-      final XFile? imageFile =
-      await picker.pickImage(source: ImageSource.gallery);
-
+      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
       if (imageFile == null) return;
 
       if (mounted) {
@@ -190,36 +198,34 @@ class _HomeScreenState extends State<HomeScreen>
         });
       }
 
+      // 2. Recognize Text
       final InputImage inputImage = InputImage.fromFilePath(imageFile.path);
-      final RecognizedText recognizedText =
-      await _textRecognizer.processImage(inputImage);
-
+      final RecognizedText recognizedText = await _textRecognizer.processImage(inputImage);
       final String fullTextFromImage = recognizedText.text;
 
       if (fullTextFromImage.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("Could not recognize any text in the image.")),
+          const SnackBar(content: Text("Could not recognize any text.")),
         );
         _clearImageSearch();
         return;
       }
 
-      final List<String> medicineNames = medicineViewModel.allMedicineNames;
+      // 3. THE HYBRID SOLUTION: Find the best match using the local (paginated) list as a guide.
+      final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, localMedicineNames);
 
-      final BestMatch bestMatch =
-      StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
-
-      if (bestMatch.bestMatch.rating != null &&
-          bestMatch.bestMatch.rating! > 0.3) {
+      // 4. If a good match is found, use that CLEAN name for the network search.
+      if (bestMatch.bestMatch.rating != null && bestMatch.bestMatch.rating! > 0.2) {
         final String foundMedicineName = bestMatch.bestMatch.target!;
+        print("Image text matched to clean name: '$foundMedicineName'. Triggering network search.");
+
         _searchController.text = foundMedicineName;
         _searchController.selection = TextSelection.fromPosition(
             TextPosition(offset: _searchController.text.length));
         _triggerSearch(foundMedicineName);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not find a matching medicine.")),
+          const SnackBar(content: Text("Could not find a matching medicine from the image.")),
         );
         _clearImageSearch();
       }
@@ -231,6 +237,9 @@ class _HomeScreenState extends State<HomeScreen>
       _clearImageSearch();
     }
   }
+  // =========================================================================
+  // ====================== END: الكود الذي تم تعديله ========================
+  // =========================================================================
 
   void _clearImageSearch() {
     setState(() {
@@ -331,28 +340,22 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (confirm == true && mounted) {
       final medicineViewModel = context.read<MedicineViewModel>();
-      final authViewModel = context.read<AuthViewModel>();
-      try {
-        await medicineViewModel.deleteMedicine(
-            pharmacyId: medicine.pharmacyId, medicineId: medicine.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Medicine deleted successfully'),
-                backgroundColor: Colors.green),
-          );
-          medicineViewModel.loadMedicines(
-              pharmacyId: authViewModel.activePharmacyId,
-              forceLoadAll: authViewModel.isAdmin);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Failed to delete medicine: ${e.toString()}'),
-                backgroundColor: Colors.red),
-          );
-        }
+
+      await medicineViewModel.deleteMedicine(
+          pharmacyId: medicine.pharmacyId, medicineId: medicine.id);
+
+      if (mounted && medicineViewModel.error.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(medicineViewModel.error),
+              backgroundColor: Colors.red),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Medicine deleted successfully'),
+              backgroundColor: Colors.green),
+        );
       }
     }
   }
@@ -456,9 +459,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // =========================================================================
-  // =================== START: الكود الذي تم تعديله =======================
-  // =========================================================================
   Widget _buildMedicineCard(
       BuildContext context, MedicineModel medicine, double cardWidth) {
     final authViewModel = context.watch<AuthViewModel>();
@@ -477,15 +477,13 @@ class _HomeScreenState extends State<HomeScreen>
     final bool isNormalUser =
         !authViewModel.isAdmin && !authViewModel.isPharmacy;
 
-    // ✨ ويدجت ذكي للتعامل مع الصور
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
       final imageUrl = medicine.imageUrl!;
       if (imageUrl.toLowerCase().endsWith('.svg')) {
-        // ✨ استخدم SvgPicture.network لصور SVG
         imageWidget = SvgPicture.network(
           imageUrl,
-          fit: BoxFit.contain, // Contain قد يكون أفضل لـ SVG
+          fit: BoxFit.contain,
           width: double.infinity,
           height: 140,
           placeholderBuilder: (context) => const Center(
@@ -493,7 +491,6 @@ class _HomeScreenState extends State<HomeScreen>
               CircularProgressIndicator(color: Color(0xFF636AE8))),
         );
       } else {
-        // ✨ استخدم Image.network للصور الأخرى
         imageWidget = Image.network(
           imageUrl,
           fit: BoxFit.cover,
@@ -512,13 +509,9 @@ class _HomeScreenState extends State<HomeScreen>
         );
       }
     } else {
-      // ✨ صورة احتياطية في حال عدم وجود رابط
       imageWidget = const Icon(Icons.medication_liquid_outlined,
           size: 90, color: Color(0xFF636AE8));
     }
-    // =========================================================================
-    // ====================== END: الكود الذي تم تعديله ========================
-    // =========================================================================
 
     return Container(
       width: cardWidth,
@@ -556,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ClipRRect(
                           borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(20)),
-                          child: imageWidget, // ✨ استخدام الويدجت الذكي هنا
+                          child: imageWidget,
                         ),
                         if (medicine.canBeSell)
                           Positioned(
@@ -613,7 +606,6 @@ class _HomeScreenState extends State<HomeScreen>
                               const SizedBox(width: 4),
                               InkWell(
                                 onTap: () {
-                                  // Find the pharmacy in the view model list
                                   final pharmacyViewModel =
                                   context.read<PharmacyViewModel>();
                                   PharmacyModel? pharmacy;
@@ -622,7 +614,7 @@ class _HomeScreenState extends State<HomeScreen>
                                         .firstWhere((p) =>
                                     p.id == medicine.pharmacyId);
                                   } catch (e) {
-                                    pharmacy = null; // Pharmacy not found
+                                    pharmacy = null;
                                   }
 
                                   if (pharmacy != null) {

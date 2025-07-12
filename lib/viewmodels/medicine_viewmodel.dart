@@ -21,7 +21,6 @@ class MedicineViewModel extends ChangeNotifier {
   bool _hasNextPage = true;
   bool _isFetchingMore = false;
 
-  // ✨✨ Missing property added here to resolve the error ✨✨
   String? pharmacyIdForLoadedMedicines;
 
   MedicineViewModel(this._medicineRepository, this._pharmacyRepository);
@@ -31,6 +30,7 @@ class MedicineViewModel extends ChangeNotifier {
   String get error => _error;
   bool get isFetchingMore => _isFetchingMore;
 
+  // ✨ Getter to get all medicine names for search matching ✨
   List<String> get allMedicineNames =>
       _originalMedicinesList.map((med) => med.name).toList();
 
@@ -39,7 +39,6 @@ class MedicineViewModel extends ChangeNotifier {
     _isLoading = true;
     _error = '';
     _lastSearchQuery = '';
-    // ✨ Set the ID at the beginning of the load process
     pharmacyIdForLoadedMedicines = pharmacyId;
     notifyListeners();
 
@@ -57,7 +56,6 @@ class MedicineViewModel extends ChangeNotifier {
         _originalMedicinesList = List.from(_medicines);
         _hasNextPage = false;
       } else {
-        // If loading all, clear the specific pharmacy ID
         pharmacyIdForLoadedMedicines = null;
         final response =
         await _medicineRepository.getAllMedicines(page: _currentPage);
@@ -126,7 +124,6 @@ class MedicineViewModel extends ChangeNotifier {
     _isLoading = true;
     _error = '';
     _lastSearchQuery = query;
-    // When searching, we are not in a specific pharmacy context unless specified
     pharmacyIdForLoadedMedicines = pharmacyId;
     notifyListeners();
 
