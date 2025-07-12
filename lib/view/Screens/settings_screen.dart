@@ -1,3 +1,5 @@
+// lib/view/Screens/settings_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_pharma_net/view/Screens/change_password_screen.dart';
@@ -31,12 +33,9 @@ class SettingsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20.0),
             children: [
               if (user != null)
-              // START OF FIX: Handled nullable strings
                 _buildProfileHeader(context, user.firstName ?? 'No Name', user.email ?? 'No Email'),
-              // END OF FIX
               const SizedBox(height: 30),
               _buildSettingsCard(context, [
-
                 _buildSettingsItem(
                   context,
                   icon: Icons.lock_outline,
@@ -121,6 +120,10 @@ class SettingsScreen extends StatelessWidget {
   }
 
   void _showDeleteConfirmationDialog(BuildContext context) {
+    final passwordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final authViewModel = context.read<AuthViewModel>();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -130,19 +133,64 @@ class SettingsScreen extends StatelessWidget {
           side: BorderSide(color: Colors.redAccent.withOpacity(0.5)),
         ),
         title: const Text('Delete Account', style: TextStyle(color: Colors.white)),
-        content: const Text('Are you sure you want to permanently delete your account? This action cannot be undone.', style: TextStyle(color: Colors.white70)),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'To permanently delete your account, please enter your password. This action cannot be undone.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 20),
+              GlowingTextField(
+                controller: passwordController,
+                hintText: 'Current Password',
+                prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                isPassword: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Password is required to delete the account';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(ctx).pop();
-              final success = await context.read<AuthViewModel>().deleteAccount();
-              if (success && context.mounted) {
-                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()), (route) => false);
+              if (formKey.currentState!.validate()) {
+                final navigator = Navigator.of(ctx);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+                final success = await authViewModel.deleteAccount(
+                  currentPassword: passwordController.text,
+                );
+
+                if (navigator.mounted) {
+                  navigator.pop();
+                }
+
+                if (success) {
+                  scaffoldMessenger.showSnackBar(
+                    const SnackBar(content: Text('Account deleted successfully.'), backgroundColor: Colors.green),
+                  );
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const WelcomeScreen()), (route) => false);
+                  }
+                } else {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('Failed to delete account: ${authViewModel.errorMessage ?? "Unknown error"}'), backgroundColor: Colors.red),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Delete'),
+            child: const Text('Confirm Deletion'),
           ),
         ],
       ),

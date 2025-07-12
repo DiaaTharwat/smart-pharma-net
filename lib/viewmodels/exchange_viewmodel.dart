@@ -169,7 +169,7 @@ class ExchangeViewModel extends BaseViewModel {
       );
 
       Provider.of<DashboardViewModel>(context, listen: false)
-          .fetchDashboardStats();
+          .refreshData();
 
       _exchangeOrderPlacedSuccessfully = true;
       notifyListeners();

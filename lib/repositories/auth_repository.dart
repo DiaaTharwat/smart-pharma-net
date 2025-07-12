@@ -217,14 +217,22 @@ class AuthRepository {
     }
   }
 
-  Future<void> deleteAccount() async {
+  // =========================================================================
+  // =================== START: الكود الذي تم تعديله =======================
+  // =========================================================================
+  /// ✨ تم تعديل الدالة لتقبل وتمرير كلمة المرور
+  Future<void> deleteAccount({required String currentPassword}) async {
     try {
-      await _apiService.deleteAccount();
+      // ✨ تمرير كلمة المرور إلى الـ ApiService
+      await _apiService.deleteAccount(currentPassword: currentPassword);
     } catch (e) {
       print('Error in AuthRepository deleteAccount: $e');
       rethrow;
     }
   }
+// =========================================================================
+// ==================== END: الكود الذي تم تعديله ======================
+// =========================================================================
 
 // =========================================================================
 // =================== END: USER SETTINGS REPOSITORY METHODS ===============

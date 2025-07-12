@@ -254,7 +254,7 @@ class OrderViewModel extends BaseViewModel {
 
     try {
       await _orderRepository.updateOrderStatus(orderId, newStatus);
-      Provider.of<DashboardViewModel>(context, listen: false).fetchDashboardStats();
+      Provider.of<DashboardViewModel>(context, listen: false) .refreshData();
       await loadImportantNotifications();
     } catch (e) {
       if (!_isDisposed) {

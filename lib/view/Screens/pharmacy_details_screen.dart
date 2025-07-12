@@ -1,3 +1,5 @@
+// lib/view/Screens/pharmacy_details_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -123,7 +125,6 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
     }
   }
 
-  // --- ✅ التصحيح النهائي لدالة البحث بالصورة ---
   void _pickImageAndRecognizeText() async {
     if (_originalMedicines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,7 +151,6 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
         return;
       }
 
-      // --- هذا هو المنطق الصحيح ---
       final List<String> medicineNames = _originalMedicines.map((m) => m.name).toList();
       final BestMatch bestMatch = StringSimilarity.findBestMatch(fullTextFromImage, medicineNames);
 
@@ -165,7 +165,6 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
         );
         _clearImageSearch();
       }
-      // --------------------------
 
     } catch (e) {
       print("Error picking image or recognizing text: $e");
@@ -474,13 +473,22 @@ class _PharmacyDetailsScreenState extends State<PharmacyDetailsScreen> with Sing
                   position: _slideAnimation,
                   child: Column(
                     children: [
+                      // =========================================================================
+                      // =================== START: الكود الذي تم تعديله =======================
+                      // =========================================================================
                       _buildDetailRow(title: 'Name', value: widget.pharmacy.name, icon: Icons.store),
                       const SizedBox(height: 20),
-                      _buildDetailRow(title: 'City', value: widget.pharmacy.city, icon: Icons.location_city),
+                      // ✨ استخدام '??' لتوفير قيمة افتراضية في حال كانت القيمة null
+                      _buildDetailRow(title: 'City', value: widget.pharmacy.city ?? 'Not Available', icon: Icons.location_city),
                       const SizedBox(height: 20),
-                      _buildDetailRow(title: 'License Number', value: widget.pharmacy.licenseNumber, icon: Icons.badge),
+                      // ✨ استخدام '??' لتوفير قيمة افتراضية
+                      _buildDetailRow(title: 'License Number', value: widget.pharmacy.licenseNumber ?? 'Not Available', icon: Icons.badge),
                       const SizedBox(height: 20),
-                      _buildDetailRow(title: 'Location (Lat, Long)', value: '${widget.pharmacy.latitude}, ${widget.pharmacy.longitude}', icon: Icons.location_on),
+                      // ✨ استخدام '??' وتحويل القيمة إلى نص
+                      _buildDetailRow(title: 'Location (Lat, Long)', value: '${widget.pharmacy.latitude ?? 0.0}, ${widget.pharmacy.longitude ?? 0.0}', icon: Icons.location_on),
+                      // =========================================================================
+                      // ==================== END: الكود الذي تم تعديله ======================
+                      // =========================================================================
                     ],
                   ),
                 ),

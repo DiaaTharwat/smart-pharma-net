@@ -1,17 +1,18 @@
+// lib/view/Screens/add_pharmacy_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:smart_pharma_net/models/pharmacy_model.dart'; // Import PharmacyModel
+import 'package:smart_pharma_net/models/pharmacy_model.dart';
 import 'package:smart_pharma_net/viewmodels/auth_viewmodel.dart';
 import 'package:smart_pharma_net/viewmodels/pharmacy_viewmodel.dart';
-import 'package:smart_pharma_net/view/Screens/available_pharmacy_screen.dart';
 import 'package:smart_pharma_net/view/Screens/admin_login_screen.dart';
 import 'package:smart_pharma_net/view/Widgets/common_ui_elements.dart';
 
 class AddPharmacyScreen extends StatefulWidget {
-  final PharmacyModel? pharmacyToEdit; // Make it optional for adding new
+  final PharmacyModel? pharmacyToEdit;
 
   const AddPharmacyScreen({super.key, this.pharmacyToEdit});
 
@@ -45,14 +46,22 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
     _isEditMode = widget.pharmacyToEdit != null;
 
     if (_isEditMode) {
-      // Populate fields if in edit mode
       final pharmacy = widget.pharmacyToEdit!;
       _nameController.text = pharmacy.name;
-      _cityController.text = pharmacy.city;
-      _licenseNumberController.text = pharmacy.licenseNumber;
-      _latitudeController.text = pharmacy.latitude.toString();
-      _longitudeController.text = pharmacy.longitude.toString();
-      _selectedLocation = LatLng(pharmacy.latitude, pharmacy.longitude);
+      // =========================================================================
+      // =================== START: الكود الذي تم تعديله =======================
+      // =========================================================================
+      // ✨ استخدام '??' لتوفير قيمة افتراضية في حال كانت القيمة null
+      _cityController.text = pharmacy.city ?? '';
+      _licenseNumberController.text = pharmacy.licenseNumber ?? '';
+      _latitudeController.text = (pharmacy.latitude ?? 0.0).toString();
+      _longitudeController.text = (pharmacy.longitude ?? 0.0).toString();
+      if (pharmacy.latitude != null && pharmacy.longitude != null) {
+        _selectedLocation = LatLng(pharmacy.latitude!, pharmacy.longitude!);
+      }
+      // =========================================================================
+      // ==================== END: الكود الذي تم تعديله ======================
+      // =========================================================================
     }
 
     _setupAnimations();
@@ -96,7 +105,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
     _longitudeController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _mapController.dispose();
+    // _mapController is disposed by the FlutterMap widget itself
     _controller.dispose();
     super.dispose();
   }
@@ -161,7 +170,6 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
         final longitude = double.parse(_longitudeController.text);
 
         if (_isEditMode) {
-          // ============ UPDATE LOGIC ============
           await pharmacyViewModel.updatePharmacy(
             id: widget.pharmacyToEdit!.id,
             name: _nameController.text,
@@ -173,7 +181,6 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
             authViewModel: authViewModel,
           );
         } else {
-          // ============ ADD LOGIC ============
           await pharmacyViewModel.addPharmacy(
             name: _nameController.text,
             city: _cityController.text,
@@ -247,7 +254,6 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
     }
   }
 
-  // ========== بداية التعديل: تم تصحيح طريقة استدعاء الأيقونة ==========
   Widget _buildFormField({
     required TextEditingController controller,
     required String hintText,
@@ -263,7 +269,7 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
         child: GlowingTextField(
           controller: controller,
           hintText: hintText,
-          prefixIcon: Icon(icon, color: Colors.white70), // تم التصحيح هنا
+          prefixIcon: Icon(icon, color: Colors.white70),
           isPassword: isPassword,
           keyboardType: keyboardType,
           validator: validator,
@@ -271,7 +277,6 @@ class _AddPharmacyScreenState extends State<AddPharmacyScreen> with TickerProvid
       ),
     );
   }
-  // ========== نهاية التعديل ==========
 
 
   Widget _buildMapSection() {

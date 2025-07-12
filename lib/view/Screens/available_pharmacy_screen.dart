@@ -1,3 +1,5 @@
+// lib/view/Screens/available_pharmacy_screen.dart
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -100,7 +102,6 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
     }
   }
 
-  // --- ✅ التصحيح النهائي لدالة البحث الصوتي ---
   void _startListening() {
     if (_speechEnabled && !_isListening) {
       if (mounted) {
@@ -114,13 +115,12 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
               _searchController.selection = TextSelection.fromPosition(
                 TextPosition(offset: _searchController.text.length),
               );
-              // استدعاء الفلترة الفورية مع كل تغيير
               _triggerSearch(result.recognizedWords);
             });
           }
         },
-        listenFor: const Duration(seconds: 10), // مدة الاستماع الإجمالية
-        pauseFor: const Duration(seconds: 3),  // مدة الصمت قبل الإيقاف التلقائي
+        listenFor: const Duration(seconds: 10),
+        pauseFor: const Duration(seconds: 3),
       );
     }
   }
@@ -301,8 +301,9 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                               ),
                             ),
                             const SizedBox(height: 6),
+                            // ✨✨ Fix Applied Here ✨✨
                             Text(
-                              pharmacy.city,
+                              pharmacy.city ?? 'N/A', // Using '??' for default value
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.white.withOpacity(0.8),
@@ -430,8 +431,9 @@ class _AvailablePharmaciesScreenState extends State<AvailablePharmaciesScreen>
                         color: Colors.white70,
                       ),
                       const SizedBox(width: 12),
+                      // ✨✨ Fix Applied Here ✨✨
                       Text(
-                        'License: ${pharmacy.licenseNumber}',
+                        'License: ${pharmacy.licenseNumber ?? 'N/A'}', // Using '??' for default value
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 16,

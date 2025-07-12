@@ -21,15 +21,15 @@ class MedicineViewModel extends ChangeNotifier {
   bool _hasNextPage = true;
   bool _isFetchingMore = false;
 
+  // ✨✨ Missing property added here to resolve the error ✨✨
+  String? pharmacyIdForLoadedMedicines;
+
   MedicineViewModel(this._medicineRepository, this._pharmacyRepository);
 
   List<MedicineModel> get medicines => _medicines;
   bool get isLoading => _isLoading;
   String get error => _error;
-
-  // ========== ✅ Fix Start: Added public getter for isFetchingMore ==========
   bool get isFetchingMore => _isFetchingMore;
-  // ========== ✅ Fix End ==========
 
   List<String> get allMedicineNames =>
       _originalMedicinesList.map((med) => med.name).toList();
@@ -39,6 +39,8 @@ class MedicineViewModel extends ChangeNotifier {
     _isLoading = true;
     _error = '';
     _lastSearchQuery = '';
+    // ✨ Set the ID at the beginning of the load process
+    pharmacyIdForLoadedMedicines = pharmacyId;
     notifyListeners();
 
     try {
@@ -55,6 +57,8 @@ class MedicineViewModel extends ChangeNotifier {
         _originalMedicinesList = List.from(_medicines);
         _hasNextPage = false;
       } else {
+        // If loading all, clear the specific pharmacy ID
+        pharmacyIdForLoadedMedicines = null;
         final response =
         await _medicineRepository.getAllMedicines(page: _currentPage);
         final fetchedMedicines = response['medicines'] as List<MedicineModel>;
@@ -122,6 +126,8 @@ class MedicineViewModel extends ChangeNotifier {
     _isLoading = true;
     _error = '';
     _lastSearchQuery = query;
+    // When searching, we are not in a specific pharmacy context unless specified
+    pharmacyIdForLoadedMedicines = pharmacyId;
     notifyListeners();
 
     try {
@@ -130,7 +136,7 @@ class MedicineViewModel extends ChangeNotifier {
       _medicines.clear();
 
       if (query.isEmpty) {
-        await loadMedicines(forceLoadAll: true);
+        await loadMedicines(pharmacyId: pharmacyId, forceLoadAll: pharmacyId == null);
       } else {
         final response =
         await _medicineRepository.searchMedicines(query, page: _currentPage);
@@ -288,12 +294,12 @@ class MedicineViewModel extends ChangeNotifier {
         PharmacyModel? pharmacy = pharmacyMap[med.pharmacyId];
         double? calculatedDistance;
         if (pharmacy != null &&
-            pharmacy.latitude != 0.0 &&
-            pharmacy.longitude != 0.0) {
+            pharmacy.latitude != null &&
+            pharmacy.longitude != null) {
           calculatedDistance = distanceCalculator.as(
             LengthUnit.Meter,
             userLocation,
-            LatLng(pharmacy.latitude, pharmacy.longitude),
+            LatLng(pharmacy.latitude!, pharmacy.longitude!),
           );
         } else {
           calculatedDistance = double.infinity;

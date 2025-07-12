@@ -1,6 +1,8 @@
+// lib/view/Screens/home_screen.dart
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart'; // ✨ استيراد الحزمة الجديدة
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
@@ -454,6 +456,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // =========================================================================
+  // =================== START: الكود الذي تم تعديله =======================
+  // =========================================================================
   Widget _buildMedicineCard(
       BuildContext context, MedicineModel medicine, double cardWidth) {
     final authViewModel = context.watch<AuthViewModel>();
@@ -472,26 +477,48 @@ class _HomeScreenState extends State<HomeScreen>
     final bool isNormalUser =
         !authViewModel.isAdmin && !authViewModel.isPharmacy;
 
+    // ✨ ويدجت ذكي للتعامل مع الصور
     Widget imageWidget;
     if (medicine.imageUrl != null && medicine.imageUrl!.isNotEmpty) {
-      imageWidget = Image.network(
-        medicine.imageUrl!,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: 140,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return const Center(child: CircularProgressIndicator());
-        },
-        errorBuilder: (context, error, stackTrace) => const Icon(
-            Icons.medication_liquid_outlined,
-            size: 90,
-            color: Color(0xFF636AE8)),
-      );
+      final imageUrl = medicine.imageUrl!;
+      if (imageUrl.toLowerCase().endsWith('.svg')) {
+        // ✨ استخدم SvgPicture.network لصور SVG
+        imageWidget = SvgPicture.network(
+          imageUrl,
+          fit: BoxFit.contain, // Contain قد يكون أفضل لـ SVG
+          width: double.infinity,
+          height: 140,
+          placeholderBuilder: (context) => const Center(
+              child:
+              CircularProgressIndicator(color: Color(0xFF636AE8))),
+        );
+      } else {
+        // ✨ استخدم Image.network للصور الأخرى
+        imageWidget = Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: 140,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const Center(
+                child:
+                CircularProgressIndicator(color: Color(0xFF636AE8)));
+          },
+          errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.medication_liquid_outlined,
+              size: 90,
+              color: Color(0xFF636AE8)),
+        );
+      }
     } else {
+      // ✨ صورة احتياطية في حال عدم وجود رابط
       imageWidget = const Icon(Icons.medication_liquid_outlined,
           size: 90, color: Color(0xFF636AE8));
     }
+    // =========================================================================
+    // ====================== END: الكود الذي تم تعديله ========================
+    // =========================================================================
 
     return Container(
       width: cardWidth,
@@ -529,7 +556,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ClipRRect(
                           borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(20)),
-                          child: imageWidget,
+                          child: imageWidget, // ✨ استخدام الويدجت الذكي هنا
                         ),
                         if (medicine.canBeSell)
                           Positioned(
@@ -567,8 +594,6 @@ class _HomeScreenState extends State<HomeScreen>
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
-
-                        // >>>>>>>> THIS IS THE CORRECTED CODE BLOCK <<<<<<<<
                         if (!authViewModel.isPharmacy)
                           Row(
                             children: [
@@ -603,7 +628,6 @@ class _HomeScreenState extends State<HomeScreen>
                                   if (pharmacy != null) {
                                     _showMapDialog(
                                       pharmacy.name,
-                                      // >>>>>>>> FIX APPLIED HERE <<<<<<<<
                                       pharmacy.latitude.toString(),
                                       pharmacy.longitude.toString(),
                                     );
@@ -621,8 +645,6 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                             ],
                           ),
-                        // >>>>>>>> END OF CORRECTION <<<<<<<<
-
                         const SizedBox(height: 4),
                         Row(
                           children: [

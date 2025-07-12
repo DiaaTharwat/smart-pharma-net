@@ -237,7 +237,7 @@ class _MenuBarScreenState extends State<MenuBarScreen>
               authVm.impersonatePharmacy(selectedPharmacy);
             }
 
-            dashboardVm.fetchDashboardStats();
+            dashboardVm.refreshData();
             orderVm.loadImportantNotifications();
             orderVm.loadIncomingOrders();
           },

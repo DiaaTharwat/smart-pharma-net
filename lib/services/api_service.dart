@@ -20,7 +20,7 @@ class ApiService {
   static const int timeoutSeconds = 30;
   static const Duration tokenRefreshThreshold = Duration(minutes: 15);
 
-  // NEW: Added key for subscription type
+  // ✨ مفتاح جديد لنوع الاشتراك
   static const String subscriptionTypeKey = 'subscription_type';
 
   static const String adminTokenKey = 'admin_access_token_saved';
@@ -51,7 +51,6 @@ class ApiService {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // await init();
           final accessToken = _prefs.getString(tokenKey);
           if (accessToken != null) {
             options.headers['Authorization'] = 'Bearer $accessToken';
@@ -114,7 +113,6 @@ class ApiService {
     }
   }
 
-  // ============== NEW METHODS TO FIX THE BUILD ERROR ==============
   Future<void> saveSubscriptionType(String type) async {
     try {
       await _prefs.setString(subscriptionTypeKey, type);
@@ -128,7 +126,6 @@ class ApiService {
   Future<String?> getSubscriptionType() async {
     return _prefs.getString(subscriptionTypeKey);
   }
-  // ================================================================
 
   Future<void> saveAdditionalData(String key, String value) async {
     try {
@@ -197,7 +194,7 @@ class ApiService {
     await _prefs.remove(pharmacyNameKey);
     await _prefs.remove(adminTokenKey);
     await _prefs.remove(adminRefreshTokenKey);
-    await _prefs.remove(subscriptionTypeKey); // Also clear subscription type on logout
+    await _prefs.remove(subscriptionTypeKey);
     print('Tokens cleared successfully');
   }
 
@@ -840,38 +837,23 @@ class ApiService {
     }
   }
 
-  // =========================================================================
-  // ================= الدوال الجديدة للتعامل مع الروابط المخصصة =================
-  // =========================================================================
-
-  /// دالة لجلب البيانات من الروابط التي تتطلب `pharmacy_id`
-  ///  مثل: `exchange/get/pharmcy_seller/orders/pharmacy/{pharmacy_id}/`
   Future<dynamic> getForPharmacy(String endpoint, {required String pharmacyId}) async {
     final fullEndpoint = '$endpoint' + 'pharmacy/$pharmacyId/';
     print('Calling new GET for pharmacy endpoint: $fullEndpoint');
     return authenticatedGet(fullEndpoint);
   }
 
-  /// دالة لإرسال البيانات للروابط التي تتطلب `pharmacy_id`
-  /// مثل: `exchange/buy/order/pharmacy/{pharmacy_id}/`
   Future<dynamic> postForPharmacy(String endpoint, dynamic data, {required String pharmacyId}) async {
     final fullEndpoint = '$endpoint' + 'pharmacy/$pharmacyId/';
     print('Calling new POST for pharmacy endpoint: $fullEndpoint');
     return post(fullEndpoint, data);
   }
 
-  /// دالة لتحديث حالة الطلب باستخدام `order_id`
-  /// مثل: `exchange/update_status/{id}/`
   Future<dynamic> patchWithId(String endpoint, dynamic data, {required String resourceId}) async {
     final fullEndpoint = '$endpoint$resourceId/';
     print('Calling new PATCH with ID endpoint: $fullEndpoint');
     return patch(fullEndpoint, data);
   }
-
-  // =========================================================================
-  // =========================== نهاية الدوال الجديدة ===========================
-  // =========================================================================
-
 
   Future<bool> get isLoggedIn async {
     final token = await getAccessToken();
@@ -941,93 +923,69 @@ class ApiService {
     }
   }
 
-  // =========================================================================
-  // =================== START: USER SETTINGS API METHODS ====================
-  // =========================================================================
-
-  /// Fetches the current user's profile data.
-  /// Calls `GET /auth/users/me/`
   Future<dynamic> getUserProfile() async {
     const endpoint = 'auth/users/me/';
     print('Calling GET user profile endpoint: $endpoint');
     return authenticatedGet(endpoint);
   }
 
-  /// Updates the current user's profile data.
-  /// Calls `PATCH /auth/users/me/`
   Future<dynamic> updateUserProfile(Map<String, dynamic> data) async {
     const endpoint = 'auth/users/me/';
     print('Calling PATCH to update user profile endpoint: $endpoint');
     return patch(endpoint, data);
   }
 
-  /// Changes the current user's password.
-  /// Calls `POST /auth/users/set_password/`
   Future<dynamic> changePassword(Map<String, dynamic> data) async {
     const endpoint = 'auth/users/set_password/';
     print('Calling POST to change password endpoint: $endpoint');
     return post(endpoint, data);
   }
 
-  // START OF FINAL FIX
-  /// Changes the current user's email.
-  /// This now calls the standard 'set_email' endpoint.
   Future<dynamic> changeEmail(Map<String, dynamic> data) async {
-    const endpoint = 'auth/users/set_email/'; // Corrected endpoint
+    const endpoint = 'auth/users/set_email/';
     print('Calling POST to change email endpoint: $endpoint');
     return post(endpoint, data);
   }
-  // END OF FINAL FIX
 
-  /// Deletes the current user's account.
-  /// Calls `DELETE /auth/users/me/`
-  Future<dynamic> deleteAccount() async {
+  // =========================================================================
+  // =================== START: الكود الذي تم تعديله =======================
+  // =========================================================================
+  /// ✨ تم تعديل الدالة لتقبل كلمة المرور المطلوبة
+  Future<dynamic> deleteAccount({required String currentPassword}) async {
     const endpoint = 'auth/users/me/';
-    print('Calling DELETE to remove user account endpoint: $endpoint');
-    // Using a custom authenticated delete that doesn't require an ID in the path
+    print('Calling DELETE to remove user account endpoint: $endpoint with password confirmation.');
+
     return _authenticatedRequest(() async {
-      final response = await _sendHttpRequest(
-        'DELETE',
+      // استخدام http.delete مباشرة لإرسال body مع طلب DELETE
+      final response = await http.delete(
         Uri.parse(baseUrl + endpoint),
-        headers: pharmacyHeaders,
+        headers: {
+          ...pharmacyHeaders, // دمج الهيدرز الافتراضية
+          'Content-Type': 'application/json; charset=utf-8', // التأكد من نوع المحتوى
+        },
+        // إرسال كلمة المرور في جسم الطلب كما يتوقعها الخادم
+        body: json.encode({'current_password': currentPassword}),
       );
-      // Delete requests often return 204 No Content, which is a success.
-      if (response.statusCode == 204) return null;
+
+      // عملية الحذف الناجحة غالبًا ما تعيد 204 No Content
+      if (response.statusCode == 204) {
+        return null;
+      }
+
+      // التعامل مع الأخطاء الأخرى
       return _parseResponse(response);
     });
   }
-
-// =========================================================================
-// ==================== END: USER SETTINGS API METHODS =====================
-// =========================================================================
-
-
   // =========================================================================
-  // ===================== START: DASHBOARD API METHOD =======================
+  // ==================== END: الكود الذي تم تعديله ======================
   // =========================================================================
 
-  /// Fetches dashboard statistics.
-  ///
-  /// If [pharmacyId] is provided, it fetches stats for that specific pharmacy.
-  /// This is intended for the owner role.
-  ///
-  /// If [pharmacyId] is null, it fetches:
-  /// - Global stats if the user is an owner.
-  /// - Stats for the logged-in pharmacy if the user is a pharmacy.
-  /// The backend should handle this logic based on the user's token.
-  Future<dynamic> getDashboardData({int? pharmacyId}) async {
+  Future<dynamic> getDashboardData({String? pharmacyId}) async {
     String endpoint = 'account/dashboard/';
-
-    // If a specific pharmacyId is passed (by an owner), append it to the URL.
-    if (pharmacyId != null) {
-      endpoint = 'account/dashboard/$pharmacyId/';
+    if (pharmacyId != null && pharmacyId.isNotEmpty) {
+      endpoint = 'account/dashboard/?pharmacy_id=$pharmacyId';
     }
-
     print('Calling GET dashboard data endpoint: $endpoint');
     return authenticatedGet(endpoint);
   }
-
-// =========================================================================
-// ====================== END: DASHBOARD API METHOD ========================
-// =========================================================================
 }
